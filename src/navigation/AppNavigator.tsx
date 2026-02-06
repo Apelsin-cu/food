@@ -55,9 +55,9 @@ const MainTabs = () => {
         }
       })}
     >
-      <Tab.Screen name="Refrigerator" component={RefrigeratorScreen} options={{ title: 'My Refrigerator' }} />
-      <Tab.Screen name="Recipes" component={RecipesScreen} initialParams={{ ingredients: [] }} />
-      <Tab.Screen name="Favorites" component={FavoritesScreen} />
+      <Tab.Screen name="Refrigerator" component={RefrigeratorScreen} options={{ title: 'Мой холодильник' }} />
+      <Tab.Screen name="Recipes" component={RecipesScreen} options={{ title: 'Рецепты' }} initialParams={{ ingredients: [] }} />
+      <Tab.Screen name="Favorites" component={FavoritesScreen} options={{ title: 'Избранное' }} />
     </Tab.Navigator>
   );
 }
@@ -92,7 +92,7 @@ const AppNavigator = () => {
         }}
       >
         <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
-        <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} options={{ title: 'Recipe Details' }} />
+        <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} options={{ title: 'Детали рецепта' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

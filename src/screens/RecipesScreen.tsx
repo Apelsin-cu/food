@@ -48,7 +48,7 @@ const RecipesScreen = () => {
         setRecipes(foundRecipes);
         setError(null);
       } catch (e) {
-        setError('Failed to fetch recipes. Please try again.');
+        setError('Не удалось загрузить рецепты. Попробуйте ещё.');
         console.error(e);
       } finally {
         setLoading(false);
@@ -102,7 +102,7 @@ const RecipesScreen = () => {
       setRecipes(foundRecipes);
       setError(null);
     } catch (e) {
-      setError('Failed to fetch recipes. Please try again.');
+      setError('Не удалось загрузить рецепты. Попробуйте ещё.');
       console.error(e);
     } finally {
       setLoading(false);
@@ -125,7 +125,7 @@ const RecipesScreen = () => {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={{ color: colors.text, marginTop: 10 }}>
-          {loadingGpt ? 'GPT ищет идеи рецептов...' : 'Finding recipes...'}
+          {loadingGpt ? 'GPT ищет идеи рецептов...' : 'Ищем рецепты...'}
         </Text>
       </View>
     );
@@ -170,10 +170,10 @@ const RecipesScreen = () => {
 
       {/* Фильтры */}
       <View style={[styles.filtersContainer, { backgroundColor: colors.background }]}>
-        <FilterChip label="Vegan" selected={isVegan} onSelect={() => setIsVegan(!isVegan)} colors={colors} />
-        <FilterChip label="Gluten-Free" selected={isGlutenFree} onSelect={() => setIsGlutenFree(!isGlutenFree)} colors={colors} />
-        <FilterChip label="Vegetarian" selected={isVegetarian} onSelect={() => setIsVegetarian(!isVegetarian)} colors={colors} />
-        <FilterChip label="Dairy-Free" selected={isDairyFree} onSelect={() => setIsDairyFree(!isDairyFree)} colors={colors} />
+        <FilterChip label="Веган" selected={isVegan} onSelect={() => setIsVegan(!isVegan)} colors={colors} />
+        <FilterChip label="Без глютена" selected={isGlutenFree} onSelect={() => setIsGlutenFree(!isGlutenFree)} colors={colors} />
+        <FilterChip label="Вегетарианское" selected={isVegetarian} onSelect={() => setIsVegetarian(!isVegetarian)} colors={colors} />
+        <FilterChip label="Без молока" selected={isDairyFree} onSelect={() => setIsDairyFree(!isDairyFree)} colors={colors} />
       </View>
 
       <FlatList
@@ -182,7 +182,7 @@ const RecipesScreen = () => {
         renderItem={({ item }) => (
           <RecipeCard recipe={item} onPress={() => navigation.navigate('RecipeDetail', { recipe: item })} />
         )}
-        ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.tabBarInactive }]}>No recipes found for your ingredients and filters.</Text>}
+        ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.tabBarInactive }]}>Рецепты не найдены для ваших ингредиентов и фильтров.</Text>}
         contentContainerStyle={styles.listContainer}
       />
     </View>

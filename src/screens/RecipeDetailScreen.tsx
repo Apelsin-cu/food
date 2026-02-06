@@ -21,23 +21,23 @@ const RecipeDetailScreen = () => {
         <View style={[styles.infoRow, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
           <View style={styles.infoItem}>
             <Ionicons name="timer-outline" size={20} color={colors.tabBarInactive} />
-            <Text style={[styles.infoText, { color: colors.text }]}>{recipe.cookingTime} min</Text>
+            <Text style={[styles.infoText, { color: colors.text }]}>{recipe.cookingTime} мин</Text>
           </View>
           <View style={styles.infoItem}>
             <Ionicons name="people-outline" size={20} color={colors.tabBarInactive} />
-            <Text style={[styles.infoText, { color: colors.text }]}>{recipe.servings} servings</Text>
+            <Text style={[styles.infoText, { color: colors.text }]}>{recipe.servings} порций</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Ingredients</Text>
+          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Ингредиенты</Text>
           {recipe.ingredients.map((ingredient, index) => (
             <Text key={index} style={[styles.listItem, { color: colors.text }]}>• {ingredient}</Text>
           ))}
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Instructions</Text>
+          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Инструкция</Text>
           {recipe.instructions.map((instruction, index) => (
             <View key={index} style={styles.instructionStep}>
               <Text style={[styles.stepNumber, { color: colors.primary }]}>{index + 1}</Text>

@@ -1,12 +1,12 @@
-import React, { useContext } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { FavoritesContext } from '../context/FavoritesContext';
+import React, { useContext } from 'react';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import RecipeCard from '../components/RecipeCard';
-import { RootStackParamList } from '../navigation/AppNavigator';
-import { Ionicons } from '@expo/vector-icons';
+import { FavoritesContext } from '../context/FavoritesContext';
 import { ThemeContext } from '../context/ThemeContext';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
 type FavoritesScreenNavigationProp = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
 
@@ -19,7 +19,7 @@ const FavoritesScreen = () => {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Ionicons name="heart-dislike-outline" size={80} color={colors.tabBarInactive} />
-        <Text style={[styles.emptyText, { color: colors.tabBarInactive }]}>You have no favorite recipes yet.</Text>
+        <Text style={[styles.emptyText, { color: colors.tabBarInactive }]}>У вас пока нет избранных рецептов.</Text>
       </View>
     );
   }

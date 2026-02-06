@@ -1,3 +1,5 @@
-// API ключ хранится в .env файле для безопасности
-export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+import Constants from 'expo-constants';
+
+// API ключ из app.json extra
+export const OPENAI_API_KEY = Constants.expoConfig?.extra?.openaiApiKey || '';
 export const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';

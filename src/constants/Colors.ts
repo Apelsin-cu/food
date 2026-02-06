@@ -1,16 +1,16 @@
 export const lightColors = {
-  background: '#F3F0F9', // Lighter Lavender for main background
-  card: '#FFFFFF',
+  background: '#E6E0F8', // Нежный лавандовый фон
+  card: '#F5F0FF', // Светло-лавандовый для карточек
   text: '#2D2D2D',
-  primary: '#4B0082', // Indigo
-  accent: '#9370DB', // Medium Purple
-  tabBar: '#E6E6FA', // Lavender
+  primary: '#4B0082', // Индиго
+  accent: '#9370DB', // Средний пурпурный
+  tabBar: '#DCD0F0', // Лавандовый таб-бар
   tabBarActive: '#4B0082',
   tabBarInactive: '#8A8A8A',
-  error: '#DC143C', // Crimson
-  chip: '#f0f0f0',
+  error: '#DC143C', // Малиновый
+  chip: '#D8D0E8',
   chipText: '#333',
-  border: '#eee',
+  border: '#C8C0D8',
   shadow: '#000',
 };
 

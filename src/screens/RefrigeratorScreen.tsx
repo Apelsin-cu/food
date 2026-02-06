@@ -1,11 +1,11 @@
-import React, { useState, useContext, useLayoutEffect } from 'react';
-import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { RootTabParamList } from '../navigation/AppNavigator';
-import { ThemeContext } from '../context/ThemeContext';
+import { useNavigation } from '@react-navigation/native';
+import React, { useContext, useLayoutEffect, useState } from 'react';
+import { Button, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ThemeSwitcher from '../components/ThemeSwitcher';
+import { ThemeContext } from '../context/ThemeContext';
+import { RootTabParamList } from '../navigation/AppNavigator';
 
 type RefrigeratorScreenNavigationProp = BottomTabNavigationProp<RootTabParamList, 'Refrigerator'>;
 
@@ -42,13 +42,13 @@ const RefrigeratorScreen = () => {
         <View style={styles.inputContainer}>
           <TextInput
             style={[styles.input, { borderColor: colors.accent, color: colors.text, backgroundColor: colors.card }]}
-            placeholder="Add an ingredient..."
+            placeholder="Добавить ингредиент..."
             placeholderTextColor={colors.tabBarInactive}
             value={currentIngredient}
             onChangeText={setCurrentIngredient}
             onSubmitEditing={handleAddIngredient}
           />
-          <Button title="Add" onPress={handleAddIngredient} color={colors.accent} />
+          <Button title="Добавить" onPress={handleAddIngredient} color={colors.accent} />
         </View>
         <FlatList
           data={ingredients}
@@ -61,10 +61,10 @@ const RefrigeratorScreen = () => {
               </TouchableOpacity>
             </View>
           )}
-          ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.tabBarInactive }]}>Your refrigerator is empty.</Text>}
+          ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.tabBarInactive }]}>Ваш холодильник пуст.</Text>}
         />
         <View style={styles.buttonContainer}>
-          <Button title="Find Recipes" onPress={handleFindRecipes} disabled={ingredients.length === 0} color={colors.primary} />
+          <Button title="Найти рецепты" onPress={handleFindRecipes} disabled={ingredients.length === 0} color={colors.primary} />
         </View>
       </View>
     </KeyboardAvoidingView>

@@ -19,7 +19,10 @@ const FavoritesScreen = () => {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Ionicons name="heart-dislike-outline" size={80} color={colors.tabBarInactive} />
-        <Text style={[styles.emptyText, { color: colors.tabBarInactive }]}>У вас пока нет избранных рецептов.</Text>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>Нет избранных</Text>
+        <Text style={[styles.emptyText, { color: colors.tabBarInactive }]}>
+          Нажмите ❤️ на рецепте, чтобы{"\n"}добавить его в избранное
+        </Text>
       </View>
     );
   }
@@ -42,13 +45,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   listContainer: {
     paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  emptyTitle: {
+    marginTop: 16,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   emptyText: {
-    marginTop: 20,
-    fontSize: 16,
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
 

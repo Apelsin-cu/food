@@ -1,9 +1,9 @@
-import React, { useContext } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
-import { Recipe } from '../types/recipe';
 import { Ionicons } from '@expo/vector-icons';
+import React, { useContext } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { ThemeContext } from '../context/ThemeContext';
+import { Recipe } from '../types/recipe';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -32,11 +32,11 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress }) => {
         <View style={styles.detailsContainer}>
           <View style={styles.detailItem}>
             <Ionicons name="timer-outline" size={16} color={colors.tabBarInactive} />
-            <Text style={[styles.detailText, { color: colors.tabBarInactive }]}>{recipe.cookingTime} min</Text>
+            <Text style={[styles.detailText, { color: colors.tabBarInactive }]}>{recipe.cookingTime} мин</Text>
           </View>
           <View style={styles.detailItem}>
             <Ionicons name="people-outline" size={16} color={colors.tabBarInactive} />
-            <Text style={[styles.detailText, { color: colors.tabBarInactive }]}>{recipe.servings} servings</Text>
+            <Text style={[styles.detailText, { color: colors.tabBarInactive }]}>{recipe.servings} порц.</Text>
           </View>
         </View>
       </View>

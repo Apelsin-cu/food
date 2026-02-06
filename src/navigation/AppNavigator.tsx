@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import React, { useContext } from 'react';
 import { ThemeContext } from '../context/ThemeContext';
@@ -64,9 +64,11 @@ const MainTabs = () => {
 
 const AppNavigator = () => {
   const { colors, theme } = useContext(ThemeContext);
+  const baseTheme = theme === 'dark' ? DarkTheme : DefaultTheme;
   const navigationTheme = {
-    dark: theme === 'dark',
+    ...baseTheme,
     colors: {
+      ...baseTheme.colors,
       primary: colors.primary,
       background: colors.background,
       card: colors.card,

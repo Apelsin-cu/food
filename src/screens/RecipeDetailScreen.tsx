@@ -1,9 +1,9 @@
-import React, { useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
-import { RouteProp, useRoute } from '@react-navigation/native';
-import { RootStackParamList } from '../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
+import { RouteProp, useRoute } from '@react-navigation/native';
+import React, { useContext } from 'react';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ThemeContext } from '../context/ThemeContext';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
 type RecipeDetailScreenRouteProp = RouteProp<RootStackParamList, 'RecipeDetail'>;
 
@@ -13,7 +13,7 @@ const RecipeDetailScreen = () => {
   const { colors } = useContext(ThemeContext);
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <Image source={{ uri: recipe.imageUrl }} style={styles.image} />
       <View style={styles.detailsContainer}>
         <Text style={[styles.title, { color: colors.primary }]}>{recipe.name}</Text>

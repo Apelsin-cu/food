@@ -56,3 +56,41 @@ export const getRecipeInformationBulk = async (ids: number[]): Promise<Recipe[]>
     throw error;
   }
 };
+
+/**
+ * Поиск рецептов по названию.
+ * @param query - Название рецепта для поиска.
+ * @returns Массив найденных рецептов.
+ */
+export const searchRecipesByName = async (query: string): Promise<Recipe[]> => {
+  try {
+    const response = await apiClient.get('/recipes/complexSearch', {
+      params: {
+        query: query,
+        number: 5,
+        addRecipeInformation: true,
+        fillIngredients: true,
+      },
+    });
+
+    if (response.data && response.data.results && response.data.results.length > 0) {
+      return response.data.results.map((recipe: any) => ({
+        id: recipe.id,
+        name: recipe.title,
+        imageUrl: recipe.image,
+        cookingTime: recipe.readyInMinutes || 30,
+        servings: recipe.servings || 4,
+        ingredients: recipe.extendedIngredients?.map((ing: any) => ing.original) || [],
+        instructions: recipe.analyzedInstructions?.[0]?.steps.map((step: any) => step.step) || [],
+        isVegan: recipe.vegan || false,
+        isGlutenFree: recipe.glutenFree || false,
+        isVegetarian: recipe.vegetarian || false,
+        isDairyFree: recipe.dairyFree || false,
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Error searching recipes by name:', error);
+    throw error;
+  }
+};

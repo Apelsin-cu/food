@@ -236,10 +236,11 @@ const RecipesScreen = () => {
       <FlatList
         data={filteredRecipes}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <RecipeCard 
             recipe={item} 
-            onPress={() => navigation.navigate('RecipeDetail', { recipe: item })} 
+            onPress={() => navigation.navigate('RecipeDetail', { recipe: item })}
+            index={index}
           />
         )}
         ListEmptyComponent={

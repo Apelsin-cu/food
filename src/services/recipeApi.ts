@@ -2,6 +2,37 @@ import axios from 'axios';
 import { API_KEY, BASE_URL } from '../constants/Api';
 import { Recipe } from '../types/recipe';
 
+const INGREDIENT_TRANSLATIONS: Record<string, string> = {
+  картофель: 'potato',
+  лук: 'onion',
+  чеснок: 'garlic',
+  морковь: 'carrot',
+  помидор: 'tomato',
+  томат: 'tomato',
+  огурец: 'cucumber',
+  курица: 'chicken',
+  говядина: 'beef',
+  свинина: 'pork',
+  рыба: 'fish',
+  яйца: 'eggs',
+  яйцо: 'egg',
+  молоко: 'milk',
+  сыр: 'cheese',
+  масло: 'butter',
+  рис: 'rice',
+  макароны: 'pasta',
+  гречка: 'buckwheat',
+  хлеб: 'bread',
+  капуста: 'cabbage',
+  перец: 'pepper',
+  грибы: 'mushrooms',
+};
+
+const normalizeIngredient = (value: string): string => {
+  const normalized = value.trim().toLowerCase();
+  return INGREDIENT_TRANSLATIONS[normalized] || normalized;
+};
+
 const apiClient = axios.create({
   baseURL: BASE_URL,
   params: {
@@ -11,11 +42,24 @@ const apiClient = axios.create({
 
 export const findRecipesByIngredients = async (ingredients: string[]): Promise<Recipe[]> => {
   try {
+    if (!API_KEY) {
+      throw new Error('Spoonacular API key is not configured');
+    }
+
+    const normalizedIngredients = ingredients
+      .map(normalizeIngredient)
+      .filter(Boolean);
+
+    if (normalizedIngredients.length === 0) {
+      return [];
+    }
+
     const response = await apiClient.get('/recipes/findByIngredients', {
       params: {
-        ingredients: ingredients.join(','),
-        number: 10, // Let's fetch 10 recipes for now
-        ranking: 1, // Maximize used ingredients
+        ingredients: normalizedIngredients.join(','),
+        number: 12,
+        ranking: 2,
+        ignorePantry: true,
       },
     });
 
@@ -32,6 +76,10 @@ export const findRecipesByIngredients = async (ingredients: string[]): Promise<R
 
 export const getRecipeInformationBulk = async (ids: number[]): Promise<Recipe[]> => {
   try {
+    if (ids.length === 0) {
+      return [];
+    }
+
     const response = await apiClient.get('/recipes/informationBulk', {
       params: {
         ids: ids.join(','),
@@ -50,7 +98,7 @@ export const getRecipeInformationBulk = async (ids: number[]): Promise<Recipe[]>
       isGlutenFree: recipe.glutenFree,
       isVegetarian: recipe.vegetarian,
       isDairyFree: recipe.dairyFree,
-    }));
+    })).filter((recipe: Recipe) => Boolean(recipe.name) && Boolean(recipe.imageUrl));
   } catch (error) {
     console.error('Error getting recipe information:', error);
     throw error;
@@ -64,10 +112,19 @@ export const getRecipeInformationBulk = async (ids: number[]): Promise<Recipe[]>
  */
 export const searchRecipesByName = async (query: string): Promise<Recipe[]> => {
   try {
+    if (!API_KEY) {
+      throw new Error('Spoonacular API key is not configured');
+    }
+
+    const cleanQuery = query.trim();
+    if (!cleanQuery) {
+      return [];
+    }
+
     const response = await apiClient.get('/recipes/complexSearch', {
       params: {
-        query: query,
-        number: 5,
+        query: cleanQuery,
+        number: 10,
         addRecipeInformation: true,
         fillIngredients: true,
       },
@@ -86,7 +143,7 @@ export const searchRecipesByName = async (query: string): Promise<Recipe[]> => {
         isGlutenFree: recipe.glutenFree || false,
         isVegetarian: recipe.vegetarian || false,
         isDairyFree: recipe.dairyFree || false,
-      }));
+      })).filter((recipe: Recipe) => Boolean(recipe.name) && Boolean(recipe.imageUrl));
     }
     return [];
   } catch (error) {

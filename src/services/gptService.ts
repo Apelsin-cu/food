@@ -13,6 +13,10 @@ interface GPTRecipeSuggestion {
  */
 export const getRecipeSuggestionsFromGPT = async (ingredients: string[]): Promise<string[]> => {
   try {
+    if (!OPENAI_API_KEY) {
+      throw new Error('OpenAI API key is not configured');
+    }
+
     const prompt = `У меня есть следующие ингредиенты: ${ingredients.join(', ')}.
 
 Предложи 5 названий блюд, которые можно приготовить из этих ингредиентов. 
@@ -24,7 +28,7 @@ export const getRecipeSuggestionsFromGPT = async (ingredients: string[]): Promis
     const response = await axios.post(
       OPENAI_API_URL,
       {
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -48,10 +52,15 @@ export const getRecipeSuggestionsFromGPT = async (ingredients: string[]): Promis
 
     const content = response.data.choices[0]?.message?.content;
     if (content) {
-      // Парсим JSON из ответа GPT
-      const parsed = JSON.parse(content.trim());
+      const cleaned = content
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```$/i, '')
+        .trim();
+
+      const parsed = JSON.parse(cleaned);
       if (Array.isArray(parsed)) {
-        return parsed;
+        return parsed.map((item) => String(item)).filter(Boolean);
       }
     }
     return [];
@@ -69,6 +78,10 @@ export const getRecipeSuggestionsFromGPT = async (ingredients: string[]): Promis
  */
 export const getRecipeTipsFromGPT = async (recipeName: string, ingredients: string[]): Promise<string> => {
   try {
+    if (!OPENAI_API_KEY) {
+      throw new Error('OpenAI API key is not configured');
+    }
+
     const prompt = `Я хочу приготовить "${recipeName}" из следующих ингредиентов: ${ingredients.join(', ')}.
 
 Дай краткие советы по приготовлению этого блюда (2-3 предложения).`;
@@ -76,7 +89,7 @@ export const getRecipeTipsFromGPT = async (recipeName: string, ingredients: stri
     const response = await axios.post(
       OPENAI_API_URL,
       {
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',

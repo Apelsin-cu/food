@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -6,9 +5,10 @@ import React, { useContext } from 'react';
 import { ThemeContext } from '../context/ThemeContext';
 import FavoritesScreen from '../screens/FavoritesScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
-import RecipesScreen from '../screens/RecipesScreen';
 import RefrigeratorScreen from '../screens/RefrigeratorScreen';
 import { Recipe } from '../types/recipe';
+
+const RecipesScreen = require('../screens/RecipesScreen').default;
 
 export type RootStackParamList = {
   Main: undefined;
@@ -28,22 +28,10 @@ const MainTabs = () => {
   const { colors } = useContext(ThemeContext);
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: React.ComponentProps<typeof Ionicons>['name'] = 'alert-circle';
-
-          if (route.name === 'Refrigerator') {
-            iconName = focused ? 'cube' : 'cube-outline';
-          } else if (route.name === 'Recipes') {
-            iconName = focused ? 'restaurant' : 'restaurant-outline';
-          } else if (route.name === 'Favorites') {
-            iconName = focused ? 'heart' : 'heart-outline';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
+      screenOptions={{
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,
+        tabBarIcon: () => null,
         headerStyle: {
           backgroundColor: colors.tabBar,
         },
@@ -53,7 +41,7 @@ const MainTabs = () => {
         tabBarStyle: {
           backgroundColor: colors.tabBar,
         }
-      })}
+      }}
     >
       <Tab.Screen name="Refrigerator" component={RefrigeratorScreen} options={{ title: 'Мой холодильник' }} />
       <Tab.Screen name="Recipes" component={RecipesScreen} options={{ title: 'Рецепты' }} initialParams={{ ingredients: [] }} />

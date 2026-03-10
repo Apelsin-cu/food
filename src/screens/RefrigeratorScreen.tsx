@@ -28,19 +28,20 @@ import { RootTabParamList } from '../navigation/AppNavigator';
 
 type RefrigeratorScreenNavigationProp = BottomTabNavigationProp<RootTabParamList, 'Refrigerator'>;
 
-const FOOD_EMOJIS = ['🥬', '🍅', '🥕', '🧅', '🥩', '🍗', '🧀', '🥚', '🍞', '🥛', '🍎', '🍋', '🥒', '🌶️', '🍄'];
-
-const getRandomEmoji = () => FOOD_EMOJIS[Math.floor(Math.random() * FOOD_EMOJIS.length)];
+const QUICK_INGREDIENTS = [
+  'картофель', 'лук', 'чеснок', 'морковь', 'помидор', 'огурец', 'капуста', 'перец',
+  'курица', 'говядина', 'свинина', 'рыба', 'яйца', 'молоко', 'сыр', 'масло',
+  'рис', 'макароны', 'грибы', 'хлеб',
+];
 
 interface IngredientItemProps {
   item: string;
-  emoji: string;
   onRemove: () => void;
   colors: any;
   index: number;
 }
 
-const IngredientItem: React.FC<IngredientItemProps> = ({ item, emoji, onRemove, colors, index }) => {
+const IngredientItem: React.FC<IngredientItemProps> = ({ item, onRemove, colors, index }) => {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -63,9 +64,6 @@ const IngredientItem: React.FC<IngredientItemProps> = ({ item, emoji, onRemove, 
       style={[styles.ingredientItem, animatedStyle, { backgroundColor: colors.card }]}
     >
       <View style={styles.ingredientLeft}>
-        <View style={[styles.emojiContainer, { backgroundColor: colors.accent + '20' }]}>
-          <Text style={styles.ingredientIcon}>{emoji}</Text>
-        </View>
         <Text style={[styles.ingredientText, { color: colors.text }]}>{item}</Text>
       </View>
       <TouchableOpacity 
@@ -86,10 +84,11 @@ const IngredientItem: React.FC<IngredientItemProps> = ({ item, emoji, onRemove, 
 };
 
 const RefrigeratorScreen = () => {
-  const [ingredients, setIngredients] = useState<{name: string, emoji: string}[]>([]);
+  const [ingredients, setIngredients] = useState<string[]>([]);
   const [currentIngredient, setCurrentIngredient] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const navigation = useNavigation<RefrigeratorScreenNavigationProp>();
-  const { colors, theme } = useContext(ThemeContext);
+  const { colors } = useContext(ThemeContext);
   
   const buttonScale = useSharedValue(1);
 
@@ -101,18 +100,42 @@ const RefrigeratorScreen = () => {
 
   const handleAddIngredient = () => {
     const trimmed = currentIngredient.trim().toLowerCase();
-    if (trimmed && !ingredients.find(i => i.name === trimmed)) {
-      setIngredients([...ingredients, { name: trimmed, emoji: getRandomEmoji() }]);
+    if (trimmed && !ingredients.includes(trimmed)) {
+      setIngredients((prev) => [...prev, trimmed]);
       setCurrentIngredient('');
+      setSuggestions([]);
     }
   };
 
+  const handleIngredientInputChange = (value: string) => {
+    setCurrentIngredient(value);
+    const normalized = value.trim().toLowerCase();
+
+    if (!normalized) {
+      setSuggestions([]);
+      return;
+    }
+
+    const found = QUICK_INGREDIENTS
+      .filter((item) => item.includes(normalized) && !ingredients.includes(item))
+      .slice(0, 7);
+    setSuggestions(found);
+  };
+
+  const handleSuggestionPress = (value: string) => {
+    if (!ingredients.includes(value)) {
+      setIngredients((prev) => [...prev, value]);
+    }
+    setCurrentIngredient('');
+    setSuggestions([]);
+  };
+
   const handleRemoveIngredient = (ingredientToRemove: string) => {
-    setIngredients(ingredients.filter(i => i.name !== ingredientToRemove));
+    setIngredients(ingredients.filter(i => i !== ingredientToRemove));
   };
 
   const handleFindRecipes = () => {
-    navigation.navigate('Recipes', { ingredients: ingredients.map(i => i.name) });
+    navigation.navigate('Recipes', { ingredients });
   };
 
   const animatedButtonStyle = useAnimatedStyle(() => ({
@@ -136,7 +159,7 @@ const RefrigeratorScreen = () => {
         {/* Animated Header */}
         <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
           <Text style={[styles.title, { color: colors.primary }]}>
-            🍳 Что приготовим?
+            Что приготовим?
           </Text>
           <Text style={[styles.subtitle, { color: colors.tabBarInactive }]}>
             Добавьте ингредиенты из холодильника
@@ -155,7 +178,7 @@ const RefrigeratorScreen = () => {
               placeholder="Введите ингредиент..."
               placeholderTextColor={colors.tabBarInactive}
               value={currentIngredient}
-              onChangeText={setCurrentIngredient}
+              onChangeText={handleIngredientInputChange}
               onSubmitEditing={handleAddIngredient}
               returnKeyType="done"
             />
@@ -167,6 +190,16 @@ const RefrigeratorScreen = () => {
             </TouchableOpacity>
           </View>
         </Animated.View>
+
+        {suggestions.length > 0 && (
+          <View style={[styles.suggestionsBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {suggestions.map((suggestion) => (
+              <TouchableOpacity key={suggestion} onPress={() => handleSuggestionPress(suggestion)} style={styles.suggestionButton}>
+                <Text style={{ color: colors.text }}>{suggestion}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Counter */}
         {ingredients.length > 0 && (
@@ -184,14 +217,13 @@ const RefrigeratorScreen = () => {
         {/* Ingredients List */}
         <Animated.FlatList
           data={ingredients}
-          keyExtractor={(item) => item.name}
+          keyExtractor={(item) => item}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           renderItem={({ item, index }) => (
             <IngredientItem
-              item={item.name}
-              emoji={item.emoji}
-              onRemove={() => handleRemoveIngredient(item.name)}
+              item={item}
+              onRemove={() => handleRemoveIngredient(item)}
               colors={colors}
               index={index}
             />
@@ -265,7 +297,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   inputWrapper: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -317,6 +349,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  suggestionsBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  suggestionButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ececec',
+  },
   list: {
     flex: 1,
   },
@@ -340,17 +384,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  emojiContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  ingredientIcon: {
-    fontSize: 22,
   },
   ingredientText: {
     fontSize: 16,

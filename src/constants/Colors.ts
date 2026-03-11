@@ -1,31 +1,31 @@
 export const lightColors = {
-  background: '#E6E0F8', // Нежный лавандовый фон
-  card: '#F5F0FF', // Светло-лавандовый для карточек
-  text: '#2D2D2D',
-  primary: '#4B0082', // Индиго
-  accent: '#9370DB', // Средний пурпурный
-  tabBar: '#DCD0F0', // Лавандовый таб-бар
-  tabBarActive: '#4B0082',
-  tabBarInactive: '#8A8A8A',
-  error: '#DC143C', // Малиновый
-  chip: '#D8D0E8',
-  chipText: '#333',
-  border: '#C8C0D8',
+  background: '#F6F4EE',
+  card: '#FFFFFF',
+  text: '#1F2937',
+  primary: '#0E7A5F',
+  accent: '#E38B2C',
+  tabBar: '#FFFFFF',
+  tabBarActive: '#0E7A5F',
+  tabBarInactive: '#7A869A',
+  error: '#D14343',
+  chip: '#EAF5F2',
+  chipText: '#24423A',
+  border: '#D6DFE6',
   shadow: '#000',
 };
 
 export const darkColors = {
-  background: '#1C122A', // Very dark purple
-  card: '#2C1D3E', // Darker card background
-  text: '#EAE0FF', // Light lavender text
-  primary: '#D0BBEF', // Lighter purple for primary elements
-  accent: '#A991E8', // Lighter accent
-  tabBar: '#2C1D3E',
-  tabBarActive: '#D0BBEF',
-  tabBarInactive: '#9A8EAE',
-  error: '#FF6B6B', // Lighter red for errors
-  chip: '#4A3F5E',
-  chipText: '#EAE0FF',
-  border: '#4A3F5E',
+  background: '#101A18',
+  card: '#172421',
+  text: '#EAF2EF',
+  primary: '#49C2A0',
+  accent: '#F5A94B',
+  tabBar: '#172421',
+  tabBarActive: '#49C2A0',
+  tabBarInactive: '#8CA39D',
+  error: '#FF7B7B',
+  chip: '#213732',
+  chipText: '#EAF2EF',
+  border: '#2A433D',
   shadow: '#FFF',
 };

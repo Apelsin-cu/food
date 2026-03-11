@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useContext, useLayoutEffect, useState } from 'react';
 import {
@@ -24,9 +24,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import ThemeSwitcher from '../components/ThemeSwitcher';
 import { ThemeContext } from '../context/ThemeContext';
-import { RootTabParamList } from '../navigation/AppNavigator';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
-type RefrigeratorScreenNavigationProp = BottomTabNavigationProp<RootTabParamList, 'Refrigerator'>;
+type RefrigeratorScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const QUICK_INGREDIENTS = [
   'картофель', 'лук', 'чеснок', 'морковь', 'помидор', 'огурец', 'капуста', 'перец',

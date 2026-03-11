@@ -2,6 +2,11 @@ import axios from 'axios';
 import { API_KEY, BASE_URL } from '../constants/Api';
 import { Recipe } from '../types/recipe';
 
+export interface RecipeStepVisual {
+  text: string;
+  imageUrl?: string;
+}
+
 const INGREDIENT_TRANSLATIONS: Record<string, string> = {
   картофель: 'potato',
   лук: 'onion',
@@ -33,11 +38,37 @@ const normalizeIngredient = (value: string): string => {
   return INGREDIENT_TRANSLATIONS[normalized] || normalized;
 };
 
+const resolveRecipeImage = (recipe: any): string => {
+  if (typeof recipe.image === 'string' && recipe.image.startsWith('http')) {
+    return recipe.image;
+  }
+
+  if (recipe.id) {
+    return `https://spoonacular.com/recipeImages/${recipe.id}-636x393.jpg`;
+  }
+
+  return '';
+};
+
 const apiClient = axios.create({
   baseURL: BASE_URL,
   params: {
     apiKey: API_KEY,
   },
+});
+
+const mapRecipe = (recipe: any): Recipe => ({
+  id: recipe.id,
+  name: recipe.title,
+  imageUrl: resolveRecipeImage(recipe),
+  cookingTime: recipe.readyInMinutes || 30,
+  servings: recipe.servings || 2,
+  ingredients: recipe.extendedIngredients?.map((ing: any) => ing.original) || [],
+  instructions: recipe.analyzedInstructions?.[0]?.steps.map((step: any) => step.step) || [],
+  isVegan: Boolean(recipe.vegan),
+  isGlutenFree: Boolean(recipe.glutenFree),
+  isVegetarian: Boolean(recipe.vegetarian),
+  isDairyFree: Boolean(recipe.dairyFree),
 });
 
 export const findRecipesByIngredients = async (ingredients: string[]): Promise<Recipe[]> => {
@@ -86,19 +117,7 @@ export const getRecipeInformationBulk = async (ids: number[]): Promise<Recipe[]>
         includeNutrition: false,
       },
     });
-    return response.data.map((recipe: any) => ({
-      id: recipe.id,
-      name: recipe.title,
-      imageUrl: recipe.image,
-      cookingTime: recipe.readyInMinutes,
-      servings: recipe.servings,
-      ingredients: recipe.extendedIngredients.map((ing: any) => ing.original),
-      instructions: recipe.analyzedInstructions?.[0]?.steps.map((step: any) => step.step) || [],
-      isVegan: recipe.vegan,
-      isGlutenFree: recipe.glutenFree,
-      isVegetarian: recipe.vegetarian,
-      isDairyFree: recipe.dairyFree,
-    })).filter((recipe: Recipe) => Boolean(recipe.name) && Boolean(recipe.imageUrl));
+    return response.data.map(mapRecipe).filter((recipe: Recipe) => Boolean(recipe.name) && Boolean(recipe.imageUrl));
   } catch (error) {
     console.error('Error getting recipe information:', error);
     throw error;
@@ -131,23 +150,60 @@ export const searchRecipesByName = async (query: string): Promise<Recipe[]> => {
     });
 
     if (response.data && response.data.results && response.data.results.length > 0) {
-      return response.data.results.map((recipe: any) => ({
-        id: recipe.id,
-        name: recipe.title,
-        imageUrl: recipe.image,
-        cookingTime: recipe.readyInMinutes || 30,
-        servings: recipe.servings || 4,
-        ingredients: recipe.extendedIngredients?.map((ing: any) => ing.original) || [],
-        instructions: recipe.analyzedInstructions?.[0]?.steps.map((step: any) => step.step) || [],
-        isVegan: recipe.vegan || false,
-        isGlutenFree: recipe.glutenFree || false,
-        isVegetarian: recipe.vegetarian || false,
-        isDairyFree: recipe.dairyFree || false,
-      })).filter((recipe: Recipe) => Boolean(recipe.name) && Boolean(recipe.imageUrl));
+      return response.data.results.map(mapRecipe).filter((recipe: Recipe) => Boolean(recipe.name) && Boolean(recipe.imageUrl));
     }
     return [];
   } catch (error) {
     console.error('Error searching recipes by name:', error);
     throw error;
+  }
+};
+
+export const getRecommendedRecipes = async (): Promise<Recipe[]> => {
+  try {
+    if (!API_KEY) {
+      throw new Error('Spoonacular API key is not configured');
+    }
+
+    const response = await apiClient.get('/recipes/random', {
+      params: {
+        number: 10,
+      },
+    });
+
+    return (response.data?.recipes || [])
+      .map(mapRecipe)
+      .filter((recipe: Recipe) => Boolean(recipe.name) && Boolean(recipe.imageUrl));
+  } catch (error) {
+    console.error('Error loading recommendations:', error);
+    throw error;
+  }
+};
+
+export const getRecipeStepVisuals = async (recipeId: number): Promise<RecipeStepVisual[]> => {
+  try {
+    if (!API_KEY) {
+      throw new Error('Spoonacular API key is not configured');
+    }
+
+    const response = await apiClient.get(`/recipes/${recipeId}/analyzedInstructions`);
+    const steps = response.data?.[0]?.steps || [];
+
+    return steps.map((step: any) => {
+      const equipmentImage = step?.equipment?.[0]?.image
+        ? `https://spoonacular.com/cdn/equipment_500x500/${step.equipment[0].image}`
+        : undefined;
+      const ingredientImage = step?.ingredients?.[0]?.image
+        ? `https://spoonacular.com/cdn/ingredients_500x500/${step.ingredients[0].image}`
+        : undefined;
+
+      return {
+        text: step.step,
+        imageUrl: equipmentImage || ingredientImage,
+      };
+    });
+  } catch (error) {
+    console.error('Error loading recipe step visuals:', error);
+    return [];
   }
 };

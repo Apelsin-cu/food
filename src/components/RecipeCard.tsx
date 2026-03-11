@@ -54,6 +54,8 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, index = 0 }) =
     toggleFavorite(recipe);
   };
 
+  const calories = Math.round(recipe.servings * 140);
+
   return (
     <AnimatedTouchable 
       entering={FadeInDown.delay(index * 100).springify()}
@@ -148,7 +150,7 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, index = 0 }) =
               <Ionicons name="flame-outline" size={18} color="#FF9800" />
             </View>
             <View>
-              <Text style={[styles.statValue, { color: colors.text }]}>~{recipe.servings * 150}</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>~{calories}</Text>
               <Text style={[styles.statLabel, { color: colors.tabBarInactive }]}>ккал</Text>
             </View>
           </View>
@@ -237,17 +239,20 @@ const styles = StyleSheet.create({
   bottomContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
   },
   statsContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingRight: 8,
   },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 1,
   },
   statIcon: {
     width: 36,
@@ -267,14 +272,15 @@ const styles = StyleSheet.create({
     width: 1,
     height: 30,
     backgroundColor: 'rgba(128,128,128,0.2)',
-    marginHorizontal: 12,
+    marginHorizontal: 8,
   },
   arrowContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 4,
   },
 });
 

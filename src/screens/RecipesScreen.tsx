@@ -4,21 +4,23 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
-    ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import RecipeCard from '../components/RecipeCard';
 import { ThemeContext } from '../context/ThemeContext';
-import { RootStackParamList, RootTabParamList } from '../navigation/AppNavigator';
+import { RootStackParamList } from '../navigation/AppNavigator';
+import { translateRecipeTitlesToRussian } from '../services/gptService';
 import { findRecipesByIngredients, searchRecipesByName } from '../services/recipeApi';
 import { Recipe } from '../types/recipe';
 
-type RecipesScreenRouteProp = RouteProp<RootTabParamList, 'Recipes'>;
+type RecipesScreenRouteProp = RouteProp<RootStackParamList, 'Recipes'>;
 type RecipesScreenNavigationProp = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
+
+type SortMode = 'relevance' | 'time' | 'servings';
 
 const QUICK_PRODUCTS = [
   'картофель', 'лук', 'чеснок', 'морковь', 'помидор', 'огурец', 'капуста', 'перец',
@@ -26,229 +28,237 @@ const QUICK_PRODUCTS = [
   'рис', 'макароны', 'грибы', 'хлеб',
 ];
 
+const SORT_OPTIONS: { key: SortMode; label: string }[] = [
+  { key: 'relevance', label: 'Сортировка: по релевантности' },
+  { key: 'time', label: 'Сортировка: быстрее готовится' },
+  { key: 'servings', label: 'Сортировка: больше порций' },
+];
+
 const FilterChip = ({
   label,
-  selected,
-  onSelect,
+  active,
+  onPress,
   colors,
 }: {
   label: string;
-  selected: boolean;
-  onSelect: () => void;
+  active: boolean;
+  onPress: () => void;
   colors: any;
 }) => (
   <TouchableOpacity
+    onPress={onPress}
     style={[
-      styles.chip,
-      { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 },
-      selected && { backgroundColor: colors.primary, borderColor: colors.primary },
+      styles.filterChip,
+      { borderColor: colors.border, backgroundColor: colors.card },
+      active && { borderColor: colors.primary, backgroundColor: colors.primary + '22' },
     ]}
-    onPress={onSelect}
   >
-    <Text style={[styles.chipText, { color: colors.text }, selected && { color: 'white' }]}>{label}</Text>
+    <Text style={{ color: active ? colors.primary : colors.text }}>{label}</Text>
   </TouchableOpacity>
 );
 
 const RecipesScreen = () => {
   const route = useRoute<RecipesScreenRouteProp>();
   const navigation = useNavigation<RecipesScreenNavigationProp>();
-  const { ingredients = [] } = route.params || {};
   const { colors } = useContext(ThemeContext);
+  const initialIngredients = route.params?.ingredients || [];
+  const initialQuery = route.params?.initialQuery || '';
 
-  const [selectedIngredients, setSelectedIngredients] = useState<string[]>(ingredients);
+  const [searchText, setSearchText] = useState(initialQuery);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const [productSearchText, setProductSearchText] = useState('');
-  const [productSuggestions, setProductSuggestions] = useState<string[]>([]);
-  const [recipeSearchText, setRecipeSearchText] = useState('');
-
+  const [sortMode, setSortMode] = useState<SortMode>('relevance');
+  const [sortOpen, setSortOpen] = useState(false);
   const [isVegan, setIsVegan] = useState(false);
-  const [isGlutenFree, setIsGlutenFree] = useState(false);
   const [isVegetarian, setIsVegetarian] = useState(false);
+  const [isGlutenFree, setIsGlutenFree] = useState(false);
   const [isDairyFree, setIsDairyFree] = useState(false);
-  const [isFrying, setIsFrying] = useState(false);
-  const [isBoiling, setIsBoiling] = useState(false);
+  const [isFried, setIsFried] = useState(false);
+  const [isBoiled, setIsBoiled] = useState(false);
+  const [isBaked, setIsBaked] = useState(false);
 
-  useEffect(() => {
-    setSelectedIngredients(ingredients);
-  }, [ingredients]);
-
-  const fetchByIngredients = async (sourceIngredients: string[]) => {
-    if (sourceIngredients.length === 0) {
-      setRecipes([]);
-      setError('Добавьте хотя бы один продукт для подбора рецептов.');
-      return;
+  const parseIngredientsFromQuery = (query: string): string[] => {
+    if (query.includes(',')) {
+      return query
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
     }
 
-    setLoading(true);
-    try {
-      const foundRecipes = await findRecipesByIngredients(sourceIngredients);
-      setRecipes(foundRecipes.filter((item) => Boolean(item.imageUrl)));
-      setError(null);
-    } catch (e) {
-      setError('Не удалось загрузить рецепты. Проверьте API ключи и интернет.');
-      console.error(e);
-    } finally {
-      setLoading(false);
+    if (query.split(' ').length > 1) {
+      return [];
     }
+
+    return [query];
   };
 
   const handleSearch = async () => {
-    if (!recipeSearchText.trim()) {
-      await fetchByIngredients(selectedIngredients);
-      return;
-    }
-
+    const query = searchText.trim();
     setLoading(true);
+    setError(null);
+
     try {
-      const foundRecipes = await searchRecipesByName(recipeSearchText);
-      setRecipes(foundRecipes.filter((item) => Boolean(item.imageUrl)));
-      setError(null);
+      let found: Recipe[] = [];
+
+      if (query.length > 0) {
+        found = await searchRecipesByName(query);
+        if (found.length === 0) {
+          const asIngredients = parseIngredientsFromQuery(query);
+
+          if (asIngredients.length > 0) {
+            found = await findRecipesByIngredients(asIngredients);
+          }
+        }
+      } else if (initialIngredients.length > 0) {
+        found = await findRecipesByIngredients(initialIngredients);
+      }
+
+      const normalized = found.filter((item) => Boolean(item.imageUrl));
+      const translatedTitles = await translateRecipeTitlesToRussian(
+        normalized.map((recipe) => recipe.name)
+      );
+      const localized = normalized.map((recipe, index) => ({
+        ...recipe,
+        name: translatedTitles[index] || recipe.name,
+      }));
+
+      setRecipes(localized);
+      if (found.length === 0) {
+        setError('Ничего не найдено. Попробуйте другое название или список продуктов через запятую.');
+      }
     } catch (e) {
-      setError('Не удалось выполнить поиск по названию.');
+      setError('Ошибка поиска рецептов. Проверьте интернет и API ключи.');
       console.error(e);
     } finally {
       setLoading(false);
+      setSortOpen(false);
     }
   };
 
-  const handleProductSearchTextChange = (text: string) => {
-    setProductSearchText(text);
-
-    if (!text.trim()) {
-      setProductSuggestions([]);
-      return;
-    }
-
-    const normalized = text.trim().toLowerCase();
-    const suggestions = QUICK_PRODUCTS.filter((product) => product.includes(normalized)).slice(0, 8);
-    setProductSuggestions(suggestions);
-  };
-
-  const addProduct = (value: string) => {
-    const normalized = value.trim().toLowerCase();
-    if (!normalized) {
-      return;
-    }
-
-    if (!selectedIngredients.includes(normalized)) {
-      setSelectedIngredients((prev) => [...prev, normalized]);
-    }
-
-    setProductSearchText('');
-    setProductSuggestions([]);
-  };
-
-  const removeProduct = (value: string) => {
-    setSelectedIngredients((prev) => prev.filter((item) => item !== value));
-  };
-
-  const filteredRecipes = useMemo(() => {
-    return recipes.filter((recipe) => {
+  const sortedRecipes = useMemo(() => {
+    const filtered = recipes.filter((recipe) => {
       if (isVegan && !recipe.isVegan) return false;
-      if (isGlutenFree && !recipe.isGlutenFree) return false;
       if (isVegetarian && !recipe.isVegetarian) return false;
+      if (isGlutenFree && !recipe.isGlutenFree) return false;
       if (isDairyFree && !recipe.isDairyFree) return false;
-      if (isFrying && !recipe.instructions.some((step) => step.toLowerCase().includes('fry'))) return false;
-      if (isBoiling && !recipe.instructions.some((step) => step.toLowerCase().includes('boil'))) return false;
+
+      const joinedSteps = recipe.instructions.join(' ').toLowerCase();
+      if (isFried && !/жар|обжар|fry|saute/.test(joinedSteps)) return false;
+      if (isBoiled && !/вар|кип|boil/.test(joinedSteps)) return false;
+      if (isBaked && !/духов|запек|bake|oven|roast/.test(joinedSteps)) return false;
+
       return true;
     });
-  }, [recipes, isVegan, isGlutenFree, isVegetarian, isDairyFree, isFrying, isBoiling]);
+
+    const clone = [...filtered];
+    if (sortMode === 'time') {
+      clone.sort((a, b) => a.cookingTime - b.cookingTime);
+    }
+    if (sortMode === 'servings') {
+      clone.sort((a, b) => b.servings - a.servings);
+    }
+    return clone;
+  }, [recipes, sortMode, isVegan, isVegetarian, isGlutenFree, isDairyFree, isFried, isBoiled, isBaked]);
+
+  const quickHint = QUICK_PRODUCTS.join(', ');
+
+  useEffect(() => {
+    if ((initialQuery && initialQuery.trim()) || initialIngredients.length > 0) {
+      handleSearch();
+    }
+  }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={styles.searchSection}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
+      <Text style={[styles.headline, { color: colors.text }]}>Найди рецепт по продуктам или названию</Text>
+      <Text style={[styles.subHeadline, { color: colors.tabBarInactive }]}>Пример: курица, грибы, сливки</Text>
+
+      <View style={[styles.controlsCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+        <View style={styles.searchRow}>
         <TextInput
           style={[styles.searchInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.card }]}
-          placeholder="Быстрый поиск продукта"
+          placeholder="Введите продукт"
           placeholderTextColor={colors.tabBarInactive}
-          value={productSearchText}
-          onChangeText={handleProductSearchTextChange}
-          onSubmitEditing={() => addProduct(productSearchText)}
-          returnKeyType="done"
-        />
-        <TouchableOpacity style={[styles.searchButton, { backgroundColor: colors.primary }]} onPress={() => addProduct(productSearchText)}>
-          <Text style={styles.searchButtonText}>Добавить</Text>
-        </TouchableOpacity>
-      </View>
-
-      {productSuggestions.length > 0 && (
-        <ScrollView style={[styles.suggestionsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {productSuggestions.map((suggestion) => (
-            <TouchableOpacity key={suggestion} onPress={() => addProduct(suggestion)}>
-              <Text style={[styles.suggestionItem, { color: colors.text }]}>{suggestion}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-
-      <View style={styles.ingredientsRow}>
-        {selectedIngredients.map((item) => (
-          <TouchableOpacity key={item} style={[styles.selectedChip, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => removeProduct(item)}>
-            <Text style={{ color: colors.text }}>{item} x</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.searchSection}>
-        <TextInput
-          style={[styles.searchInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.card }]}
-          placeholder="Поиск рецепта по названию"
-          placeholderTextColor={colors.tabBarInactive}
-          value={recipeSearchText}
-          onChangeText={setRecipeSearchText}
+          value={searchText}
+          onChangeText={setSearchText}
           onSubmitEditing={handleSearch}
           returnKeyType="search"
         />
         <TouchableOpacity style={[styles.searchButton, { backgroundColor: colors.primary }]} onPress={handleSearch}>
           <Text style={styles.searchButtonText}>Искать</Text>
         </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.sortButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+          onPress={() => setSortOpen((prev) => !prev)}
+        >
+          <Text style={{ color: colors.text }}>{SORT_OPTIONS.find((item) => item.key === sortMode)?.label}</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.filtersContainer}>
-        <FilterChip label="Веган" selected={isVegan} onSelect={() => setIsVegan(!isVegan)} colors={colors} />
-        <FilterChip label="Без глютена" selected={isGlutenFree} onSelect={() => setIsGlutenFree(!isGlutenFree)} colors={colors} />
-        <FilterChip label="Вегетарианское" selected={isVegetarian} onSelect={() => setIsVegetarian(!isVegetarian)} colors={colors} />
-        <FilterChip label="Без молока" selected={isDairyFree} onSelect={() => setIsDairyFree(!isDairyFree)} colors={colors} />
-        <FilterChip label="Жарка" selected={isFrying} onSelect={() => setIsFrying(!isFrying)} colors={colors} />
-        <FilterChip label="Варка" selected={isBoiling} onSelect={() => setIsBoiling(!isBoiling)} colors={colors} />
+      {sortOpen && (
+        <View style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+          {SORT_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.key}
+              style={styles.dropdownItem}
+              onPress={() => {
+                setSortMode(option.key);
+                setSortOpen(false);
+              }}
+            >
+              <Text style={{ color: option.key === sortMode ? colors.primary : colors.text }}>{option.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.filtersWrap}>
+        <FilterChip label="Веган" active={isVegan} onPress={() => setIsVegan((v) => !v)} colors={colors} />
+        <FilterChip label="Вегетарианское" active={isVegetarian} onPress={() => setIsVegetarian((v) => !v)} colors={colors} />
+        <FilterChip label="Без глютена" active={isGlutenFree} onPress={() => setIsGlutenFree((v) => !v)} colors={colors} />
+        <FilterChip label="Без молока" active={isDairyFree} onPress={() => setIsDairyFree((v) => !v)} colors={colors} />
+        <FilterChip label="Жареное" active={isFried} onPress={() => setIsFried((v) => !v)} colors={colors} />
+        <FilterChip label="Вареное" active={isBoiled} onPress={() => setIsBoiled((v) => !v)} colors={colors} />
+        <FilterChip label="В духовке" active={isBaked} onPress={() => setIsBaked((v) => !v)} colors={colors} />
       </View>
+
+      {!loading && recipes.length === 0 && !error && (
+        <View style={[styles.emptyHintWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.hintText, { color: colors.tabBarInactive }]}>Примеры для поиска: {quickHint}</Text>
+        </View>
+      )}
 
       {loading && (
-        <View style={[styles.centerContainer, { backgroundColor: colors.background }]}> 
+        <View style={styles.centerWrap}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.text }]}>Ищем рецепты...</Text>
+          <Text style={{ color: colors.text, marginTop: 10 }}>Ищем рецепты...</Text>
         </View>
       )}
 
       {!loading && error && (
-        <View style={[styles.centerContainer, { backgroundColor: colors.background }]}> 
-          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
-          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={() => fetchByIngredients(selectedIngredients)}>
-            <Text style={styles.retryButtonText}>Попробовать снова</Text>
+        <View style={styles.centerWrap}>
+          <Text style={{ color: colors.error, textAlign: 'center', marginBottom: 10 }}>{error}</Text>
+          <TouchableOpacity style={[styles.searchButton, { backgroundColor: colors.primary }]} onPress={handleSearch}>
+            <Text style={styles.searchButtonText}>Повторить</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {!loading && !error && (
         <FlatList
-          data={filteredRecipes}
+          data={sortedRecipes}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item, index }) => (
             <RecipeCard
               recipe={item}
-              onPress={() => navigation.navigate('RecipeDetail', { recipe: item })}
               index={index}
+              onPress={() => navigation.navigate('RecipeDetail', { recipe: item })}
             />
           )}
-          ListEmptyComponent={
-            <View style={styles.emptyListContainer}>
-              <Text style={[styles.emptyListText, { color: colors.tabBarInactive }]}>Рецепты не найдены для выбранных продуктов и фильтров</Text>
-            </View>
-          }
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={styles.listContent}
         />
       )}
     </View>
@@ -256,111 +266,106 @@ const RecipesScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  centerContainer: {
+  container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    paddingTop: 12,
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
+  headline: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginHorizontal: 12,
+    marginBottom: 8,
   },
-  errorText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 16,
+  subHeadline: {
+    marginHorizontal: 12,
+    marginBottom: 8,
   },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 20,
+  controlsCard: {
+    marginHorizontal: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    marginBottom: 8,
   },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  listContainer: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  searchSection: {
+  searchRow: {
     flexDirection: 'row',
-    paddingHorizontal: 10,
-    marginTop: 10,
     gap: 8,
   },
   searchInput: {
     flex: 1,
-    height: 44,
+    height: 46,
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   searchButton: {
-    height: 44,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    height: 46,
+    borderRadius: 12,
+    paddingHorizontal: 16,
     justifyContent: 'center',
   },
   searchButtonText: {
     color: 'white',
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  suggestionsContainer: {
-    maxHeight: 160,
-    marginHorizontal: 10,
-    marginTop: 6,
-    borderRadius: 8,
+  sortButton: {
+    marginTop: 10,
     borderWidth: 1,
-  },
-  suggestionItem: {
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 11,
+  },
+  dropdown: {
+    marginHorizontal: 12,
+    marginTop: 6,
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#ececec',
   },
-  ingredientsRow: {
+  filtersWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 10,
-    paddingTop: 8,
     gap: 8,
+    marginHorizontal: 12,
+    marginTop: 8,
   },
-  selectedChip: {
+  filterChip: {
     borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  filtersContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    borderRadius: 14,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: 'center',
   },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    margin: 4,
+  hintText: {
+    lineHeight: 20,
   },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '500',
+  emptyHintWrap: {
+    marginHorizontal: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
-  emptyListContainer: {
+  centerWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
     paddingHorizontal: 20,
   },
-  emptyListText: {
-    textAlign: 'center',
-    fontSize: 15,
+  listContent: {
+    paddingTop: 8,
+    paddingBottom: 16,
   },
 });
 

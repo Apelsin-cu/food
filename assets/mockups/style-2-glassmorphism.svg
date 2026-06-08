@@ -1,0 +1,57 @@
+﻿<svg width="1080" height="1920" viewBox="0 0 1080 1920" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1080" y2="1920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DFF7F1"/>
+      <stop offset="0.5" stop-color="#F4FBFF"/>
+      <stop offset="1" stop-color="#FFEDE2"/>
+    </linearGradient>
+    <linearGradient id="hero" x1="130" y1="260" x2="950" y2="830" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#68E1C8" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#FF8A65" stop-opacity="0.32"/>
+    </linearGradient>
+    <filter id="blur40" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="20"/>
+    </filter>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#2B4667" flood-opacity="0.20"/>
+    </filter>
+  </defs>
+
+  <rect width="1080" height="1920" fill="url(#bg)"/>
+
+  <circle cx="220" cy="270" r="180" fill="#7BE6D0" fill-opacity="0.40" filter="url(#blur40)"/>
+  <circle cx="900" cy="420" r="220" fill="#FFB088" fill-opacity="0.35" filter="url(#blur40)"/>
+  <circle cx="860" cy="1550" r="260" fill="#6BC5FF" fill-opacity="0.18" filter="url(#blur40)"/>
+
+  <rect x="70" y="90" width="940" height="1740" rx="58" fill="url(#hero)" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="3" filter="url(#shadow)"/>
+
+  <text x="130" y="220" fill="#18424A" font-size="38" font-family="Sora, Arial" font-weight="700">Glassmorphism Pro</text>
+  <text x="130" y="268" fill="#2F5860" fill-opacity="0.8" font-size="24" font-family="DM Sans, Arial">Food discovery with soft glass layers</text>
+
+  <rect x="130" y="320" width="820" height="86" rx="30" fill="#FFFFFF" fill-opacity="0.45" stroke="#FFFFFF" stroke-opacity="0.75"/>
+  <text x="170" y="373" fill="#2D4E56" font-size="28" font-family="DM Sans, Arial">Search ingredients...</text>
+
+  <rect x="130" y="450" width="220" height="66" rx="24" fill="#FFFFFF" fill-opacity="0.50" stroke="#FFFFFF" stroke-opacity="0.75"/>
+  <text x="170" y="493" fill="#174851" font-size="24" font-family="DM Sans, Arial">Quick dinner</text>
+  <rect x="370" y="450" width="170" height="66" rx="24" fill="#FFFFFF" fill-opacity="0.42" stroke="#FFFFFF" stroke-opacity="0.75"/>
+  <text x="425" y="493" fill="#174851" font-size="24" font-family="DM Sans, Arial">Soup</text>
+  <rect x="560" y="450" width="190" height="66" rx="24" fill="#FFFFFF" fill-opacity="0.42" stroke="#FFFFFF" stroke-opacity="0.75"/>
+  <text x="612" y="493" fill="#174851" font-size="24" font-family="DM Sans, Arial">Chicken</text>
+
+  <rect x="130" y="570" width="820" height="460" rx="36" fill="#FFFFFF" fill-opacity="0.38" stroke="#FFFFFF" stroke-opacity="0.68"/>
+  <rect x="160" y="602" width="760" height="270" rx="28" fill="#88B3A8"/>
+  <rect x="160" y="602" width="760" height="270" rx="28" fill="url(#hero)"/>
+  <text x="190" y="920" fill="#143E45" font-size="38" font-family="Sora, Arial" font-weight="700">Creamy Mushroom Pasta</text>
+  <text x="190" y="964" fill="#28535C" font-size="24" font-family="DM Sans, Arial">25 min   •   2 servings   •   420 kcal</text>
+
+  <rect x="130" y="1065" width="820" height="300" rx="32" fill="#FFFFFF" fill-opacity="0.34" stroke="#FFFFFF" stroke-opacity="0.62"/>
+  <text x="180" y="1130" fill="#113B43" font-size="32" font-family="Sora, Arial" font-weight="700">Recommended today</text>
+  <text x="180" y="1180" fill="#2B5560" font-size="24" font-family="DM Sans, Arial">Fresh, light and balanced recipes</text>
+  <rect x="180" y="1220" width="300" height="86" rx="28" fill="#0F7E72" fill-opacity="0.86"/>
+  <text x="230" y="1274" fill="#FFFFFF" font-size="26" font-family="DM Sans, Arial" font-weight="700">Open catalog</text>
+
+  <rect x="210" y="1710" width="660" height="88" rx="34" fill="#FFFFFF" fill-opacity="0.42" stroke="#FFFFFF" stroke-opacity="0.76"/>
+  <circle cx="330" cy="1754" r="16" fill="#137F73"/>
+  <circle cx="540" cy="1754" r="16" fill="#2A5D66" fill-opacity="0.55"/>
+  <circle cx="750" cy="1754" r="16" fill="#2A5D66" fill-opacity="0.55"/>
+</svg>

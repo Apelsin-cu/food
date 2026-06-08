@@ -1,140 +1,25 @@
-import axios from 'axios';
-import { OPENAI_API_KEY, OPENAI_API_URL } from '../constants/OpenAI';
 import { Recipe } from '../types/recipe';
+import { apiClient, ensureApiConfigured } from './http';
+import {
+  DetailedRussianRecipe,
+  generateLocalDetailedRecipe,
+  isLocalRecipe,
+} from './localRecipeService';
 
-interface GPTRecipeSuggestion {
-  recipeName: string;
-  description: string;
+interface DetailedRecipeResponse {
+  recipe: DetailedRussianRecipe;
 }
 
-/**
- * Запрашивает у GPT идеи рецептов на основе предоставленных ингредиентов.
- * @param ingredients - Массив ингредиентов, которые есть у пользователя.
- * @returns Массив предложенных названий рецептов.
- */
-export const getRecipeSuggestionsFromGPT = async (ingredients: string[]): Promise<string[]> => {
-  try {
-    if (!OPENAI_API_KEY) {
-      throw new Error('OpenAI API key is not configured');
-    }
-
-    const prompt = `У меня есть следующие ингредиенты: ${ingredients.join(', ')}.
-
-Предложи 5 названий блюд, которые можно приготовить из этих ингредиентов. 
-Ответь ТОЛЬКО в формате JSON массива строк с названиями блюд на английском языке.
-Пример ответа: ["Pasta Carbonara", "Chicken Stir Fry", "Vegetable Soup"]
-
-Ответ:`;
-
-    const response = await axios.post(
-      OPENAI_API_URL,
-      {
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful culinary assistant. You suggest recipes based on available ingredients. Always respond with a JSON array of recipe names in English.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: 200,
-        temperature: 0.7,
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    const content = response.data.choices[0]?.message?.content;
-    if (content) {
-      const cleaned = content
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```$/i, '')
-        .trim();
-
-      const parsed = JSON.parse(cleaned);
-      if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item)).filter(Boolean);
-      }
-    }
-    return [];
-  } catch (error) {
-    console.error('Error fetching GPT suggestions:', error);
-    return [];
-  }
-};
-
-/**
- * Получает детальные рекомендации от GPT для конкретного рецепта.
- * @param recipeName - Название рецепта.
- * @param ingredients - Доступные ингредиенты.
- * @returns Рекомендации по приготовлению.
- */
-export const getRecipeTipsFromGPT = async (recipeName: string, ingredients: string[]): Promise<string> => {
-  try {
-    if (!OPENAI_API_KEY) {
-      throw new Error('OpenAI API key is not configured');
-    }
-
-    const prompt = `Я хочу приготовить "${recipeName}" из следующих ингредиентов: ${ingredients.join(', ')}.
-
-Дай краткие советы по приготовлению этого блюда (2-3 предложения).`;
-
-    const response = await axios.post(
-      OPENAI_API_URL,
-      {
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful culinary assistant. Provide brief cooking tips in Russian.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: 150,
-        temperature: 0.7,
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    const content = response.data.choices[0]?.message?.content;
-    return content || '';
-  } catch (error) {
-    console.error('Error fetching GPT tips:', error);
-    return '';
-  }
-};
-
-export interface DetailedRussianRecipe {
-  title: string;
-  ingredients: string[];
-  steps: string[];
+interface TranslatedTitlesResponse {
+  titles: string[];
 }
 
-const parseJsonContent = (raw: string) => {
-  const cleaned = raw
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/```$/i, '')
-    .trim();
+interface TipsResponse {
+  tips: string;
+}
 
-  return JSON.parse(cleaned);
-};
+const MIN_DETAILED_STEPS = 5;
+const MIN_DETAILED_STEP_LENGTH = 55;
 
 const DICTIONARY: Record<string, string> = {
   chicken: 'курица',
@@ -146,8 +31,8 @@ const DICTIONARY: Record<string, string> = {
   tuna: 'тунец',
   garlic: 'чеснок',
   onion: 'лук',
-  tomato: 'томат',
-  tomatoes: 'томаты',
+  tomato: 'помидор',
+  tomatoes: 'помидоры',
   potato: 'картофель',
   potatoes: 'картофель',
   carrot: 'морковь',
@@ -168,149 +53,156 @@ const DICTIONARY: Record<string, string> = {
   bread: 'хлеб',
   butter: 'сливочное масло',
   sauce: 'соус',
-  recipe: 'рецепт',
-  dish: 'блюдо',
   creamy: 'сливочный',
   spicy: 'острый',
   roasted: 'запеченный',
   grilled: 'на гриле',
   fried: 'жареный',
   baked: 'запеченный',
-  boil: 'варить',
   boiled: 'вареный',
-  bake: 'запекать',
-  fry: 'жарить',
-  saute: 'обжарить',
-  cook: 'готовить',
-  cooked: 'приготовленный',
-  in: 'в',
-  for: 'для',
-  of: '',
+  recipe: 'рецепт',
+  dish: 'блюдо',
   with: 'с',
   and: 'и',
 };
 
-export const fallbackTranslateTextToRussian = (text: string): string => {
-  const words = text.split(/\s+/).map((raw) => {
-    const clean = raw.toLowerCase().replace(/[^a-z]/g, '');
-    const translated = DICTIONARY[clean];
-    if (translated === '') {
-      return '';
-    }
-    return translated || raw;
-  });
-
-  return words.filter(Boolean).join(' ').replace(/\s{2,}/g, ' ').trim();
-};
-
-const fallbackTranslateTitle = (title: string): string => {
-  const translated = fallbackTranslateTextToRussian(title);
-  if (!translated) {
-    return title;
+const isDetailedRecipe = (value: unknown): value is DetailedRussianRecipe => {
+  if (!value || typeof value !== 'object') {
+    return false;
   }
 
-  const result = translated;
-  return result || title;
+  const recipe = value as DetailedRussianRecipe;
+  return (
+    typeof recipe.title === 'string' &&
+    Array.isArray(recipe.ingredients) &&
+    Array.isArray(recipe.steps)
+  );
+};
+
+const hasDetailedSteps = (steps: string[]): boolean => {
+  if (steps.length < MIN_DETAILED_STEPS) {
+    return false;
+  }
+
+  const averageLength =
+    steps.reduce((sum, step) => sum + step.trim().length, 0) / Math.max(steps.length, 1);
+
+  return averageLength >= MIN_DETAILED_STEP_LENGTH;
+};
+
+export const fallbackTranslateTextToRussian = (text: string): string => {
+  const translated = text
+    .split(/\s+/)
+    .map((raw) => {
+      const clean = raw.toLowerCase().replace(/[^a-z]/g, '');
+      return DICTIONARY[clean] || raw;
+    })
+    .join(' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return translated || text;
+};
+
+export const generateRecipeFromIngredients = async (
+  ingredients: string[]
+): Promise<DetailedRussianRecipe | null> => {
+  try {
+    ensureApiConfigured();
+    const response = await apiClient.post<DetailedRecipeResponse>('/ai/generate-recipe', {
+      ingredients,
+    });
+
+    return isDetailedRecipe(response.data?.recipe)
+      ? response.data.recipe
+      : generateLocalDetailedRecipe(ingredients);
+  } catch (error) {
+    console.error('Error generating recipe from ingredients:', error);
+    return generateLocalDetailedRecipe(ingredients);
+  }
+};
+
+export const getRecipeTipsFromGPT = async (
+  recipeName: string,
+  ingredients: string[]
+): Promise<string> => {
+  try {
+    ensureApiConfigured();
+    const response = await apiClient.post<TipsResponse>('/ai/recipe-tips', {
+      recipeName,
+      ingredients,
+    });
+
+    return response.data?.tips || '';
+  } catch (error) {
+    console.error('Error fetching GPT tips:', error);
+    return 'Совет: готовьте на среднем огне и пробуйте блюдо в процессе, чтобы вовремя скорректировать соль и специи.';
+  }
 };
 
 export const translateRecipeTitlesToRussian = async (titles: string[]): Promise<string[]> => {
+  if (titles.length === 0) {
+    return [];
+  }
+
+  if (titles.every((title) => /[А-Яа-яЁё]/.test(title))) {
+    return titles;
+  }
+
   try {
-    if (!OPENAI_API_KEY || titles.length === 0) {
-      return titles.map(fallbackTranslateTitle);
+    ensureApiConfigured();
+    const response = await apiClient.post<TranslatedTitlesResponse>('/ai/translate-titles', {
+      titles,
+    });
+
+    if (!Array.isArray(response.data?.titles)) {
+      return titles.map(fallbackTranslateTextToRussian);
     }
 
-    const response = await axios.post(
-      OPENAI_API_URL,
-      {
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Переводи названия блюд на русский кулинарный язык. Верни только JSON-массив строк, в том же порядке.',
-          },
-          {
-            role: 'user',
-            content: `Переведи названия: ${JSON.stringify(titles)}`,
-          },
-        ],
-        max_tokens: 400,
-        temperature: 0.2,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
+    return response.data.titles.map((item, index) =>
+      String(item || fallbackTranslateTextToRussian(titles[index] || ''))
     );
-
-    const content = response.data.choices?.[0]?.message?.content;
-    if (!content) {
-      return titles.map(fallbackTranslateTitle);
-    }
-
-    const parsed = parseJsonContent(content);
-    if (!Array.isArray(parsed)) {
-      return titles.map(fallbackTranslateTitle);
-    }
-
-    return parsed.map((item, index) => String(item || fallbackTranslateTitle(titles[index] || '')));
   } catch (error) {
     console.error('Error translating recipe titles:', error);
-    return titles.map(fallbackTranslateTitle);
+    return titles.map(fallbackTranslateTextToRussian);
   }
 };
 
-export const getDetailedRecipeInRussian = async (recipe: Recipe): Promise<DetailedRussianRecipe | null> => {
-  try {
-    if (!OPENAI_API_KEY) {
-      throw new Error('OpenAI API key is not configured');
-    }
-
-    const prompt = `Данные рецепта:\nНазвание: ${recipe.name}\nИнгредиенты: ${recipe.ingredients.join(', ')}\nИнструкция: ${recipe.instructions.join(' | ')}\n\nСделай полностью русский вариант. Нужны подробные пошаговые инструкции (минимум 6 шагов, каждый шаг 2-3 предложения).\nОтвет строго JSON формата:\n{\"title\":\"...\",\"ingredients\":[\"...\"],\"steps\":[\"...\"]}`;
-
-    const response = await axios.post(
-      OPENAI_API_URL,
-      {
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Ты кулинарный редактор. Пишешь только на русском, понятно и подробно.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: 900,
-        temperature: 0.4,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    const content = response.data.choices?.[0]?.message?.content;
-    if (!content) {
-      return null;
-    }
-
-    const parsed = parseJsonContent(content);
-    if (!parsed || !Array.isArray(parsed.ingredients) || !Array.isArray(parsed.steps)) {
-      return null;
-    }
-
+export const getDetailedRecipeInRussian = async (
+  recipe: Recipe
+): Promise<DetailedRussianRecipe | null> => {
+  if (isLocalRecipe(recipe)) {
     return {
-      title: String(parsed.title || recipe.name),
-      ingredients: parsed.ingredients.map((item: unknown) => String(item)),
-      steps: parsed.steps.map((item: unknown) => String(item)),
+      title: recipe.name,
+      ingredients: recipe.ingredients,
+      steps: recipe.instructions,
     };
+  }
+
+  try {
+    ensureApiConfigured();
+    const response = await apiClient.post<DetailedRecipeResponse>('/ai/localize-recipe', {
+      recipe,
+    });
+
+    if (isDetailedRecipe(response.data?.recipe)) {
+      return response.data.recipe;
+    }
   } catch (error) {
     console.error('Error generating detailed russian recipe:', error);
-    return null;
   }
+
+  const ingredients =
+    recipe.ingredients.length > 0 ? recipe.ingredients : recipe.name.split(',').map((item) => item.trim());
+  const localDetailed = generateLocalDetailedRecipe(ingredients);
+  const translatedInstructions = recipe.instructions.map((step) => fallbackTranslateTextToRussian(step));
+  const fallbackSteps = hasDetailedSteps(translatedInstructions)
+    ? translatedInstructions
+    : localDetailed.steps;
+
+  return {
+    title: fallbackTranslateTextToRussian(recipe.name),
+    ingredients: recipe.ingredients.map((item) => fallbackTranslateTextToRussian(item)),
+    steps: fallbackSteps,
+  };
 };

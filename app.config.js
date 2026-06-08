@@ -28,9 +28,10 @@ const readEnvFile = () => {
 };
 
 const envFromFile = readEnvFile();
-const spoonacularApiKey = process.env.SPOONACULAR_API_KEY || envFromFile.SPOONACULAR_API_KEY || '';
-const openaiApiKey = process.env.OPENAI_API_KEY || envFromFile.OPENAI_API_KEY || '';
-const deepaiApiKey = process.env.DEEPAI_API_KEY || envFromFile.DEEPAI_API_KEY || '';
+const apiBaseUrl =
+  process.env.EXPO_PUBLIC_API_BASE_URL ||
+  envFromFile.EXPO_PUBLIC_API_BASE_URL ||
+  '';
 
 export default {
   expo: {
@@ -51,6 +52,7 @@ export default {
       supportsTablet: true
     },
     android: {
+      versionCode: 4,
       package: "com.flavorfinder.app",
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
@@ -68,9 +70,7 @@ export default {
       eas: {
         projectId: "23446a48-64a0-4f3c-ad72-f17caad6c827"
       },
-      spoonacularApiKey,
-      openaiApiKey,
-      deepaiApiKey
+      apiBaseUrl
     }
   }
 };

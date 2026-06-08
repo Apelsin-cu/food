@@ -1,13 +1,66 @@
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
-import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { ThemeContext } from '../context/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { fallbackTranslateTextToRussian, getDetailedRecipeInRussian } from '../services/gptService';
-import { getStepImageWithCache } from '../services/imageGenerationService';
+import { getRecipeImageWithCache, getStepImageWithCache } from '../services/imageGenerationService';
+import { getFallbackRecipeImage, isLocalRecipe } from '../services/localRecipeService';
+import { getRecipeStepVisuals } from '../services/recipeApi';
+import {
+  getLocalStepVisualAsset,
+  getRecipeSpecificStepImageAsset,
+  getRecipeSpecificStepImageUrl,
+} from '../services/stepVisualAssets';
 
 type RecipeDetailScreenRouteProp = RouteProp<RootStackParamList, 'RecipeDetail'>;
+
+type StepVisualHint = {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  colors: [string, string];
+};
+
+const getStepVisualHint = (stepText: string): StepVisualHint => {
+  const text = stepText.toLowerCase();
+
+  if (/(нареж|пореж|измельч|нашинку|cut|chop|slice)/.test(text)) {
+    return { icon: 'cut-outline', label: 'Подготовка ингредиентов', colors: ['#F7D7B5', '#F0B17A'] };
+  }
+
+  if (/(разогре|обжар|жар|сковород|fry|saute|sear|pan)/.test(text)) {
+    return { icon: 'flame-outline', label: 'Обжарка', colors: ['#F8B38A', '#E57C55'] };
+  }
+
+  if (/(отвар|вар|кип|boil|simmer|pot)/.test(text)) {
+    return { icon: 'water-outline', label: 'Варка', colors: ['#B7D9F7', '#6FA6D8'] };
+  }
+
+  if (/(запек|духов|печ|bake|oven|roast)/.test(text)) {
+    return { icon: 'restaurant-outline', label: 'Запекание', colors: ['#D8B48B', '#B97345'] };
+  }
+
+  if (/(смеш|перемеш|соедин|mix|stir|combine)/.test(text)) {
+    return { icon: 'refresh-outline', label: 'Смешивание', colors: ['#C6DFC8', '#7AAC7F'] };
+  }
+
+  if (/(пода|укрась|serve|plate|garnish)/.test(text)) {
+    return { icon: 'sparkles-outline', label: 'Подача', colors: ['#F6D8C6', '#D89B72'] };
+  }
+
+  return { icon: 'restaurant-outline', label: 'Шаг приготовления', colors: ['#E8D8C8', '#C9A98B'] };
+};
 
 const RecipeDetailScreen = () => {
   const route = useRoute<RecipeDetailScreenRouteProp>();
@@ -16,137 +69,280 @@ const RecipeDetailScreen = () => {
   const [titleRu, setTitleRu] = useState(recipe.name);
   const [ingredientsRu, setIngredientsRu] = useState<string[]>(recipe.ingredients);
   const [stepsRu, setStepsRu] = useState<string[]>(recipe.instructions);
+  const [heroImageUrl, setHeroImageUrl] = useState(recipe.imageUrl);
   const [stepImages, setStepImages] = useState<string[]>([]);
+  const [failedStepImages, setFailedStepImages] = useState<Record<string, boolean>>({});
   const [enriching, setEnriching] = useState(false);
-  const [attemptedImageIndexes, setAttemptedImageIndexes] = useState<number[]>([]);
   const [generatingImages, setGeneratingImages] = useState(false);
+  const [generatingHeroImage, setGeneratingHeroImage] = useState(false);
+  const requestedStepIndexesRef = useRef<Set<number>>(new Set());
+  const builtInRecipe = isLocalRecipe(recipe);
+  const resolvedHeroImage = heroImageUrl || getFallbackRecipeImage(titleRu, ingredientsRu);
 
   useEffect(() => {
+    let cancelled = false;
+
     const localize = async () => {
       setEnriching(true);
-      const detailed = await getDetailedRecipeInRussian(recipe);
+      try {
+        const [detailed, visuals] = await Promise.all([
+          getDetailedRecipeInRussian(recipe),
+          getRecipeStepVisuals(recipe.id),
+        ]);
 
-      if (detailed) {
-        setTitleRu(detailed.title);
-        setIngredientsRu(detailed.ingredients);
-        setStepsRu(detailed.steps);
-      } else {
-        setTitleRu(fallbackTranslateTextToRussian(recipe.name));
-        setIngredientsRu(recipe.ingredients.map((item) => fallbackTranslateTextToRussian(item)));
-        if (recipe.instructions.length > 0) {
-          const expanded = recipe.instructions.map(
-            (step, idx) =>
-              `Шаг ${idx + 1}. ${fallbackTranslateTextToRussian(step)}. После выполнения шага проверьте вкус, соль и степень готовности ингредиентов, затем переходите к следующему шагу.`
-          );
-          setStepsRu(expanded);
+        if (cancelled) {
+          return;
+        }
+
+        const fallbackTitle = fallbackTranslateTextToRussian(recipe.name);
+        const fallbackIngredients = recipe.ingredients.map((item) => fallbackTranslateTextToRussian(item));
+        const fallbackSteps =
+          recipe.instructions.length > 0
+            ? recipe.instructions.map((step) => fallbackTranslateTextToRussian(step))
+            : visuals
+                .map((item) => fallbackTranslateTextToRussian(item.text || ''))
+                .filter((item) => item.trim().length > 0);
+
+        setTitleRu(detailed?.title || fallbackTitle);
+        setIngredientsRu(detailed?.ingredients?.length ? detailed.ingredients : fallbackIngredients);
+        setStepsRu(detailed?.steps?.length ? detailed.steps : fallbackSteps);
+        setStepImages(visuals.map((item) => item.imageUrl || ''));
+      } finally {
+        if (!cancelled) {
+          setEnriching(false);
         }
       }
-
-      setEnriching(false);
     };
 
+    setHeroImageUrl(recipe.imageUrl);
+    setStepImages([]);
+    setFailedStepImages({});
+    requestedStepIndexesRef.current = new Set();
+
+    if (builtInRecipe) {
+      setTitleRu(recipe.name);
+      setIngredientsRu(recipe.ingredients);
+      setStepsRu(recipe.instructions);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     localize();
-  }, [recipe]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [builtInRecipe, recipe]);
 
   useEffect(() => {
+    const generateHeroImage = async () => {
+      if (builtInRecipe || heroImageUrl || !titleRu.trim()) {
+        return;
+      }
+
+      setGeneratingHeroImage(true);
+      const generated = await getRecipeImageWithCache(recipe.id, titleRu, ingredientsRu);
+      if (generated) {
+        setHeroImageUrl(generated);
+      }
+      setGeneratingHeroImage(false);
+    };
+
+    generateHeroImage();
+  }, [builtInRecipe, heroImageUrl, ingredientsRu, recipe.id, titleRu]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     const generateMissingStepImages = async () => {
-      if (stepsRu.length === 0) {
+      if (builtInRecipe || stepsRu.length === 0) {
         return;
       }
 
       const missingIndexes = stepsRu
         .map((_, index) => index)
-        .filter((index) => !stepImages[index] && !attemptedImageIndexes.includes(index))
-        .slice(0, 4);
+        .filter((index) => !stepImages[index] && !requestedStepIndexesRef.current.has(index));
 
       if (missingIndexes.length === 0) {
         return;
       }
 
+      missingIndexes.forEach((index) => requestedStepIndexesRef.current.add(index));
+
       setGeneratingImages(true);
+      try {
+        for (let offset = 0; offset < missingIndexes.length; offset += 4) {
+          const batch = missingIndexes.slice(offset, offset + 4);
+          const results = await Promise.all(
+            batch.map(async (index) => ({
+              index,
+              generated: await getStepImageWithCache(recipe.id, stepsRu[index], titleRu, index + 1),
+            }))
+          );
 
-      for (const index of missingIndexes) {
-        const generated = await getStepImageWithCache(recipe.id, stepsRu[index], titleRu, index + 1);
-        setAttemptedImageIndexes((prev) => [...prev, index]);
+          if (cancelled) {
+            return;
+          }
 
-        if (generated) {
           setStepImages((prev) => {
             const next = [...prev];
-            next[index] = generated;
+            results.forEach((result) => {
+              if (result.generated) {
+                next[result.index] = result.generated;
+              }
+            });
             return next;
           });
         }
+      } finally {
+        if (!cancelled) {
+          setGeneratingImages(false);
+        }
       }
-
-      setGeneratingImages(false);
     };
 
     generateMissingStepImages();
-  }, [stepsRu, stepImages, attemptedImageIndexes, titleRu]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [builtInRecipe, stepsRu, stepImages, titleRu, recipe.id]);
 
   const stepCards = useMemo(
     () =>
-      stepsRu.map((text, index) => ({
-        id: `${index}`,
-        text,
-        imageUrl: stepImages[index],
-      })),
-    [stepsRu, stepImages]
+      stepsRu.map((text, index) => {
+        const recipeSpecificImage = getRecipeSpecificStepImageAsset(recipe.id, index);
+
+        return {
+          id: `${index}`,
+          text,
+          imageUrl: stepImages[index] || getRecipeSpecificStepImageUrl(recipe.id, index),
+          localImageSource: recipeSpecificImage || getLocalStepVisualAsset(text, index, stepsRu.length),
+          visualHint: getStepVisualHint(text),
+        };
+      }),
+    [recipe.id, stepImages, stepsRu]
   );
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Image source={{ uri: recipe.imageUrl }} style={styles.image} />
+      <View style={styles.heroWrap}>
+        {resolvedHeroImage ? (
+          <Image source={{ uri: resolvedHeroImage }} style={styles.heroImage} />
+        ) : (
+          <LinearGradient
+            colors={[colors.primary, colors.accent]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.heroImage, styles.heroPlaceholder]}
+          >
+            <Ionicons name="restaurant-outline" size={54} color="#fff" />
+          </LinearGradient>
+        )}
+      </View>
+
       <View style={styles.detailsContainer}>
-        <Text style={[styles.title, { color: colors.primary }]}>{titleRu}</Text>
-        
-        <View style={[styles.infoRow, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
-          <View style={styles.infoItem}>
-            <Ionicons name="timer-outline" size={20} color={colors.tabBarInactive} />
+        <Text style={[styles.title, { color: colors.text }]}>{titleRu}</Text>
+
+        {generatingHeroImage && (
+          <View style={[styles.enrichingWrap, styles.infoBadge, { backgroundColor: colors.chip }]}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.badgeTextMuted, { color: colors.tabBarInactive }]}>
+              Подбираем изображение блюда...
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.metaRow}>
+          <View style={[styles.metaCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name="timer-outline" size={20} color={colors.primary} />
             <Text style={[styles.infoText, { color: colors.text }]}>{recipe.cookingTime} мин</Text>
           </View>
-          <View style={styles.infoItem}>
-            <Ionicons name="people-outline" size={20} color={colors.tabBarInactive} />
-            <Text style={[styles.infoText, { color: colors.text }]}>{recipe.servings} порций</Text>
+          <View style={[styles.metaCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name="people-outline" size={20} color={colors.accent} />
+            <Text style={[styles.infoText, { color: colors.text }]}>{recipe.servings} порции</Text>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Ингредиенты</Text>
+        {recipe.sourceUrl && (
+          <TouchableOpacity
+            style={[styles.sourceBadge, { backgroundColor: colors.chip }]}
+            onPress={() => Linking.openURL(recipe.sourceUrl!)}
+          >
+            <Ionicons name="link-outline" size={17} color={colors.primary} />
+            <Text style={[styles.sourceText, { color: colors.primary }]}>
+              Основано на рецепте {recipe.sourceName || 'Food.ru'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Ингредиенты</Text>
           {ingredientsRu.map((ingredient, index) => (
-            <Text key={index} style={[styles.listItem, { color: colors.text }]}>• {ingredient}</Text>
+            <Text key={index} style={[styles.listItem, { color: colors.text }]}>
+              • {ingredient}
+            </Text>
           ))}
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.primary }]}>Пошаговый фото рецепт</Text>
+        <View style={styles.stepsSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Пошаговый рецепт</Text>
+
           {enriching && (
-            <View style={styles.enrichingWrap}>
+            <View style={[styles.enrichingWrap, styles.infoBadge, { backgroundColor: colors.chip }]}>
               <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={{ color: colors.tabBarInactive, marginLeft: 8 }}>Делаем подробную русскую версию...</Text>
+              <Text style={[styles.badgeTextMuted, { color: colors.tabBarInactive }]}>
+                Подготавливаем подробную русскую версию...
+              </Text>
             </View>
           )}
+
           {generatingImages && (
-            <View style={styles.enrichingWrap}>
+            <View style={[styles.enrichingWrap, styles.infoBadge, { backgroundColor: colors.chip }]}>
               <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={{ color: colors.tabBarInactive, marginLeft: 8 }}>Генерируем изображения шагов...</Text>
+              <Text style={[styles.badgeTextMuted, { color: colors.tabBarInactive }]}>
+                Подбираем изображения шагов...
+              </Text>
             </View>
           )}
-          {stepCards.map((step, index) => (
-            <View key={step.id} style={[styles.stepCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
-              {step.imageUrl ? (
-                <Image source={{ uri: step.imageUrl }} style={styles.stepImage} />
-              ) : (
-                <View style={[styles.imageFallback, { backgroundColor: colors.background }]}> 
-                  <Text style={{ color: colors.tabBarInactive }}>Фото шага генерируется...</Text>
-                </View>
-              )}
-              <View style={styles.stepTextWrap}>
-                <Text style={[styles.stepNumber, { color: colors.primary }]}>Шаг {index + 1}</Text>
-                <Text style={[styles.stepText, { color: colors.text }]}>{step.text}</Text>
+
+          {stepCards.map((step, index) => {
+            const failedRemote = failedStepImages[step.id];
+            const remoteImageSource = !failedRemote && step.imageUrl ? { uri: step.imageUrl } : null;
+            const resolvedStepImage = remoteImageSource || step.localImageSource;
+
+            return (
+            <View key={step.id} style={styles.stepCard}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>{index + 1}</Text>
               </View>
+
+              {resolvedStepImage ? (
+                <Image
+                  source={resolvedStepImage}
+                  defaultSource={step.localImageSource}
+                  style={styles.stepImage}
+                  onError={() =>
+                    remoteImageSource
+                      ? setFailedStepImages((prev) => ({
+                          ...prev,
+                          [step.id]: true,
+                        }))
+                      : undefined
+                  }
+                />
+              ) : (
+                <LinearGradient colors={step.visualHint.colors} style={styles.imageFallback}>
+                  <Ionicons name={step.visualHint.icon} size={42} color="#fff" />
+                  <Text style={styles.imageFallbackLabel}>{step.visualHint.label}</Text>
+                </LinearGradient>
+              )}
+
+              <Text style={styles.stepText}>{step.text}</Text>
             </View>
-          ))}
+            );
+          })}
         </View>
       </View>
     </ScrollView>
@@ -157,84 +353,140 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  image: {
+  heroWrap: {
+    padding: 16,
+    paddingBottom: 0,
+  },
+  heroImage: {
     width: '100%',
-    height: 300,
+    height: 270,
+    borderRadius: 28,
+  },
+  heroPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   detailsContainer: {
     padding: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: 28,
+    fontWeight: '800',
+    marginBottom: 12,
   },
-  infoRow: {
+  metaRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    gap: 10,
     marginBottom: 16,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
   },
-  infoItem: {
+  metaCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
   infoText: {
-    marginLeft: 8,
     fontSize: 16,
+    fontWeight: '700',
   },
-  section: {
-    marginBottom: 16,
+  sourceBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+  sourceText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  sectionCard: {
+    borderWidth: 1,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 18,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontWeight: '800',
+    marginBottom: 12,
   },
   listItem: {
     fontSize: 16,
     lineHeight: 24,
+    marginBottom: 4,
   },
-  instructionStep: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+  stepsSection: {
+    marginBottom: 16,
   },
   stepCard: {
-    borderWidth: 1,
-    borderRadius: 14,
-    overflow: 'hidden',
+    backgroundColor: '#2B2826',
+    borderRadius: 22,
+    padding: 14,
+    marginBottom: 14,
+  },
+  stepBadge: {
+    alignSelf: 'flex-start',
+    minWidth: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: '#FFD326',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  stepBadgeText: {
+    color: '#1A1614',
+    fontSize: 16,
+    fontWeight: '800',
   },
   stepImage: {
     width: '100%',
     height: 180,
+    borderRadius: 18,
   },
   imageFallback: {
     width: '100%',
     height: 180,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 10,
   },
-  stepTextWrap: {
-    padding: 12,
+  imageFallbackLabel: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  stepText: {
+    fontSize: 17,
+    lineHeight: 26,
+    color: '#F5EFE6',
+    marginTop: 14,
   },
   enrichingWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
   },
-  stepNumber: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 6,
+  infoBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  stepText: {
-    fontSize: 16,
-    lineHeight: 24,
-  }
+  badgeTextMuted: {
+    marginLeft: 8,
+  },
 });
 
 export default RecipeDetailScreen;

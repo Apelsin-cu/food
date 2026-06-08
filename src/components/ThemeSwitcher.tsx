@@ -8,16 +8,17 @@ const ThemeSwitcher = () => {
   const isDark = theme === 'dark';
 
   return (
-    <View style={styles.container}>
-      <Ionicons name="sunny" size={24} color={isDark ? 'gray' : colors.primary} />
+    <View style={[styles.container, { borderColor: colors.border, backgroundColor: colors.card }]}>
+      <Ionicons name="sunny-outline" size={18} color={isDark ? colors.tabBarInactive : colors.primary} />
       <Switch
-        trackColor={{ false: '#767577', true: '#D0BBEF' }}
-        thumbColor={isDark ? colors.primary : '#f4f3f4'}
-        ios_backgroundColor="#3e3e3e"
+        trackColor={{ false: colors.border, true: colors.accent + '55' }}
+        thumbColor={isDark ? colors.primary : '#fff'}
+        ios_backgroundColor={colors.border}
         onValueChange={toggleTheme}
         value={isDark}
+        style={styles.switch}
       />
-      <Ionicons name="moon" size={24} color={isDark ? colors.primary : 'gray'} />
+      <Ionicons name="moon-outline" size={18} color={isDark ? colors.primary : colors.tabBarInactive} />
     </View>
   );
 };
@@ -27,6 +28,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: 15,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 4,
+  },
+  switch: {
+    transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }],
   },
 });
 

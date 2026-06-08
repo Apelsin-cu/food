@@ -1,12 +1,5 @@
-import Constants from 'expo-constants';
+import { API_BASE_URL } from './AppConfig';
 
-const extra =
-	Constants.expoConfig?.extra ||
-	(Constants.manifest2 as any)?.extra ||
-	(Constants.manifest as any)?.extra ||
-	{};
+const BASE_URL = API_BASE_URL;
 
-const API_KEY = extra.spoonacularApiKey || '';
-const BASE_URL = 'https://api.spoonacular.com';
-
-export { API_KEY, BASE_URL };
+export { BASE_URL };

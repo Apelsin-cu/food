@@ -1,28 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useContext } from 'react';
-import {
-    Dimensions,
-    Image,
-    Platform,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
-} from 'react-native';
+import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
-    FadeInDown,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from 'react-native-reanimated';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Recipe } from '../types/recipe';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width - 32;
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -34,120 +24,127 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, index = 0 }) => {
   const { toggleFavorite, isFavorite } = useContext(FavoritesContext);
-  const { colors, theme } = useContext(ThemeContext);
+  const { colors } = useContext(ThemeContext);
   const favorite = isFavorite(recipe.id);
   const scale = useSharedValue(1);
+  const hasImage = Boolean(recipe.imageUrl);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const handlePressIn = () => {
-    scale.value = withSpring(0.97);
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1);
-  };
-
-  const handleFavoritePress = () => {
-    toggleFavorite(recipe);
-  };
-
   const calories = Math.round(recipe.servings * 140);
 
   return (
-    <AnimatedTouchable 
-      entering={FadeInDown.delay(index * 100).springify()}
-      style={[styles.card, animatedStyle, { shadowColor: colors.shadow }]} 
+    <AnimatedTouchable
+      entering={FadeInDown.delay(index * 80).springify()}
+      style={[
+        styles.card,
+        animatedStyle,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+          shadowColor: colors.shadow,
+        },
+      ]}
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+      onPressIn={() => {
+        scale.value = withSpring(0.98);
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1);
+      }}
       activeOpacity={1}
     >
       <View style={styles.imageContainer}>
-        <Image source={{ uri: recipe.imageUrl }} style={styles.image} />
-        
-        {/* Gradient Overlay */}
+        {hasImage ? (
+          <Image source={{ uri: recipe.imageUrl }} style={styles.image} />
+        ) : (
+          <LinearGradient
+            colors={[colors.primary + 'D9', colors.accent + 'B3', '#EFD8C2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.image}
+          >
+            <Ionicons name="restaurant-outline" size={42} color="#fff" />
+          </LinearGradient>
+        )}
+
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.8)']}
-          style={styles.gradient}
+          colors={['rgba(0,0,0,0.02)', 'rgba(43,33,24,0.78)']}
+          style={styles.imageGradient}
         />
-        
-        {/* Favorite Button with Blur */}
-        <TouchableOpacity 
-          style={styles.favoriteButton} 
-          onPress={handleFavoritePress}
-          activeOpacity={0.8}
+
+        <TouchableOpacity
+          style={styles.favoriteButton}
+          onPress={() => toggleFavorite(recipe)}
+          activeOpacity={0.85}
         >
-          {Platform.OS === 'ios' ? (
-            <BlurView intensity={30} tint="dark" style={styles.blurContainer}>
-              <Ionicons 
-                name={favorite ? 'heart' : 'heart-outline'} 
-                size={24} 
-                color={favorite ? '#FF6B6B' : 'white'} 
-              />
-            </BlurView>
-          ) : (
-            <View style={[styles.blurContainer, styles.androidBlur]}>
-              <Ionicons 
-                name={favorite ? 'heart' : 'heart-outline'} 
-                size={24} 
-                color={favorite ? '#FF6B6B' : 'white'} 
-              />
-            </View>
-          )}
+          <View style={styles.favoriteBubble}>
+            <Ionicons
+              name={favorite ? 'heart' : 'heart-outline'}
+              size={20}
+              color={favorite ? '#E85B52' : '#6B5A49'}
+            />
+          </View>
         </TouchableOpacity>
 
-        {/* Info Overlay */}
+        {recipe.sourceName ? (
+          <View style={styles.sourceBadge}>
+            <Ionicons name="link-outline" size={13} color="#3D2B1F" />
+            <Text style={styles.sourceBadgeText}>{recipe.sourceName}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.infoOverlay}>
-          <Text style={styles.title} numberOfLines={2}>{recipe.name}</Text>
-          
+          <Text style={styles.title} numberOfLines={2}>
+            {recipe.name}
+          </Text>
+
           <View style={styles.badgesContainer}>
             {recipe.isVegetarian && (
-              <View style={[styles.badge, { backgroundColor: '#4CAF50' }]}>
-                <Text style={styles.badgeText}>🥗 Вегетарианское</Text>
+              <View style={[styles.badge, { backgroundColor: '#EAF5EA' }]}>
+                <Text style={[styles.badgeText, { color: '#466B49' }]}>Вегетарианское</Text>
               </View>
             )}
             {recipe.isVegan && (
-              <View style={[styles.badge, { backgroundColor: '#8BC34A' }]}>
-                <Text style={styles.badgeText}>🌱 Веган</Text>
+              <View style={[styles.badge, { backgroundColor: '#DFF0E0' }]}>
+                <Text style={[styles.badgeText, { color: '#2F6B39' }]}>Веган</Text>
               </View>
             )}
           </View>
         </View>
       </View>
-      
-      {/* Bottom Info */}
-      <View style={[styles.bottomContainer, { backgroundColor: colors.card }]}>
+
+      <View style={styles.bottomContainer}>
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <View style={[styles.statIcon, { backgroundColor: colors.accent + '20' }]}>
-              <Ionicons name="timer-outline" size={18} color={colors.accent} />
+            <View style={[styles.statIcon, { backgroundColor: colors.accent + '22' }]}>
+              <Ionicons name="timer-outline" size={17} color={colors.accent} />
             </View>
             <View>
               <Text style={[styles.statValue, { color: colors.text }]}>{recipe.cookingTime}</Text>
-              <Text style={[styles.statLabel, { color: colors.tabBarInactive }]}>минут</Text>
+              <Text style={[styles.statLabel, { color: colors.tabBarInactive }]}>мин</Text>
             </View>
           </View>
-          
+
           <View style={styles.divider} />
-          
+
           <View style={styles.statItem}>
-            <View style={[styles.statIcon, { backgroundColor: colors.primary + '20' }]}>
-              <Ionicons name="people-outline" size={18} color={colors.primary} />
+            <View style={[styles.statIcon, { backgroundColor: colors.primary + '22' }]}>
+              <Ionicons name="people-outline" size={17} color={colors.primary} />
             </View>
             <View>
               <Text style={[styles.statValue, { color: colors.text }]}>{recipe.servings}</Text>
-              <Text style={[styles.statLabel, { color: colors.tabBarInactive }]}>порций</Text>
+              <Text style={[styles.statLabel, { color: colors.tabBarInactive }]}>порции</Text>
             </View>
           </View>
-          
+
           <View style={styles.divider} />
-          
+
           <View style={styles.statItem}>
-            <View style={[styles.statIcon, { backgroundColor: '#FF9800' + '20' }]}>
-              <Ionicons name="flame-outline" size={18} color="#FF9800" />
+            <View style={[styles.statIcon, { backgroundColor: '#FF980022' }]}>
+              <Ionicons name="flame-outline" size={17} color="#FFB24A" />
             </View>
             <View>
               <Text style={[styles.statValue, { color: colors.text }]}>~{calories}</Text>
@@ -155,10 +152,9 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, index = 0 }) =
             </View>
           </View>
         </View>
-        
-        {/* Arrow */}
+
         <View style={[styles.arrowContainer, { backgroundColor: colors.primary }]}>
-          <Ionicons name="arrow-forward" size={20} color="white" />
+          <Ionicons name="arrow-forward" size={20} color="#090D13" />
         </View>
       </View>
     </AnimatedTouchable>
@@ -167,58 +163,77 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress, index = 0 }) =
 
 const styles = StyleSheet.create({
   card: {
+    width: width - 32,
     borderRadius: 24,
     marginVertical: 10,
     marginHorizontal: 16,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
     overflow: 'hidden',
+    borderWidth: 1,
   },
   imageContainer: {
     position: 'relative',
   },
   image: {
     width: '100%',
-    height: 220,
+    height: 214,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  gradient: {
+  imageGradient: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 120,
+    height: 148,
   },
   favoriteButton: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 14,
+    right: 14,
   },
-  blurContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  favoriteBubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.92)',
   },
-  androidBlur: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  sourceBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 244, 224, 0.95)',
+  },
+  sourceBadgeText: {
+    color: '#3D2B1F',
+    fontSize: 12,
+    fontWeight: '800',
   },
   infoOverlay: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    fontSize: 21,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 10,
+    textShadowColor: 'rgba(0,0,0,0.55)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
@@ -227,20 +242,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   badge: {
+    borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 5,
   },
   badgeText: {
-    color: 'white',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   bottomContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
   statsContainer: {
     flex: 1,
@@ -257,30 +272,32 @@ const styles = StyleSheet.create({
   statIcon: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   statValue: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   divider: {
     width: 1,
     height: 30,
-    backgroundColor: 'rgba(128,128,128,0.2)',
+    backgroundColor: 'rgba(125,108,92,0.18)',
     marginHorizontal: 8,
   },
   arrowContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 4,
+    marginLeft: 6,
   },
 });
 

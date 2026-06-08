@@ -1,32 +1,30 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import RecipeCard from '../components/RecipeCard';
+import { AppColors } from '../constants/Colors';
 import { ThemeContext } from '../context/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { translateRecipeTitlesToRussian } from '../services/gptService';
-import { findRecipesByIngredients, searchRecipesByName } from '../services/recipeApi';
+import { generateRecipeFromIngredients, translateRecipeTitlesToRussian } from '../services/gptService';
+import { detailedRecipeToCard } from '../services/localRecipeService';
+import { findRecipesByIngredients, getLocalQuickProducts, searchRecipesByName } from '../services/recipeApi';
 import { Recipe } from '../types/recipe';
 
 type RecipesScreenRouteProp = RouteProp<RootStackParamList, 'Recipes'>;
 type RecipesScreenNavigationProp = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
-
 type SortMode = 'relevance' | 'time' | 'servings';
-
-const QUICK_PRODUCTS = [
-  'картофель', 'лук', 'чеснок', 'морковь', 'помидор', 'огурец', 'капуста', 'перец',
-  'курица', 'говядина', 'свинина', 'рыба', 'яйца', 'молоко', 'сыр', 'масло',
-  'рис', 'макароны', 'грибы', 'хлеб',
-];
 
 const SORT_OPTIONS: { key: SortMode; label: string }[] = [
   { key: 'relevance', label: 'Сортировка: по релевантности' },
@@ -43,14 +41,14 @@ const FilterChip = ({
   label: string;
   active: boolean;
   onPress: () => void;
-  colors: any;
+  colors: AppColors;
 }) => (
   <TouchableOpacity
     onPress={onPress}
     style={[
       styles.filterChip,
       { borderColor: colors.border, backgroundColor: colors.card },
-      active && { borderColor: colors.primary, backgroundColor: colors.primary + '22' },
+      active && { borderColor: colors.primary, backgroundColor: colors.primary + '18' },
     ]}
   >
     <Text style={{ color: active ? colors.primary : colors.text }}>{label}</Text>
@@ -58,11 +56,13 @@ const FilterChip = ({
 );
 
 const RecipesScreen = () => {
+  const quickProducts = getLocalQuickProducts();
   const route = useRoute<RecipesScreenRouteProp>();
   const navigation = useNavigation<RecipesScreenNavigationProp>();
-  const { colors } = useContext(ThemeContext);
+  const { colors, theme } = useContext(ThemeContext);
   const initialIngredients = route.params?.ingredients || [];
   const initialQuery = route.params?.initialQuery || '';
+  const strictIngredients = route.params?.strictIngredients || false;
 
   const [searchText, setSearchText] = useState(initialQuery);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -77,62 +77,120 @@ const RecipesScreen = () => {
   const [isFried, setIsFried] = useState(false);
   const [isBoiled, setIsBoiled] = useState(false);
   const [isBaked, setIsBaked] = useState(false);
+  const [aiRecipe, setAiRecipe] = useState<Recipe | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [selectedIngredients, setSelectedIngredients] = useState<string[]>(initialIngredients);
+  const activeFiltersCount = [
+    isVegan,
+    isVegetarian,
+    isGlutenFree,
+    isDairyFree,
+    isFried,
+    isBoiled,
+    isBaked,
+  ].filter(Boolean).length;
 
-  const parseIngredientsFromQuery = (query: string): string[] => {
-    if (query.includes(',')) {
-      return query
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
+  const addIngredient = (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+      return;
     }
 
-    if (query.split(' ').length > 1) {
-      return [];
+    setSelectedIngredients((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
+    setSearchText('');
+    setSuggestions([]);
+  };
+
+  const clearSelectedIngredients = () => {
+    setSelectedIngredients([]);
+    setRecipes([]);
+    setAiRecipe(null);
+    setError(null);
+  };
+
+  const submitIngredientInput = () => {
+    if (!searchText.trim()) {
+      return;
     }
 
-    return [query];
+    addIngredient(searchText);
+  };
+
+  const updateSuggestions = (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    if (normalized.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    setSuggestions(
+      quickProducts
+        .filter(
+          (item) =>
+            item.includes(normalized) &&
+            item !== normalized &&
+            !selectedIngredients.includes(item)
+        )
+        .slice(0, 6)
+    );
   };
 
   const handleSearch = async () => {
     const query = searchText.trim();
     setLoading(true);
     setError(null);
+    setAiRecipe(null);
 
     try {
-      let found: Recipe[] = [];
+      let ingredients = [...selectedIngredients];
+      let foundRecipes: Recipe[] = [];
 
-      if (query.length > 0) {
-        found = await searchRecipesByName(query);
-        if (found.length === 0) {
-          const asIngredients = parseIngredientsFromQuery(query);
-
-          if (asIngredients.length > 0) {
-            found = await findRecipesByIngredients(asIngredients);
-          }
+      if (query.length > 0 && ingredients.length === 0) {
+        const normalizedQuery = query.toLowerCase();
+        const matchedProduct = quickProducts.find((item) => item === normalizedQuery);
+        if (matchedProduct || query.split(/\s+/).length === 1) {
+          ingredients = [matchedProduct || normalizedQuery];
         }
-      } else if (initialIngredients.length > 0) {
-        found = await findRecipesByIngredients(initialIngredients);
       }
 
-      const normalized = found.filter((item) => Boolean(item.imageUrl));
-      const translatedTitles = await translateRecipeTitlesToRussian(
-        normalized.map((recipe) => recipe.name)
-      );
-      const localized = normalized.map((recipe, index) => ({
-        ...recipe,
-        name: translatedTitles[index] || recipe.name,
-      }));
-
-      setRecipes(localized);
-      if (found.length === 0) {
-        setError('Ничего не найдено. Попробуйте другое название или список продуктов через запятую.');
+      if (ingredients.length > 0) {
+        foundRecipes = await findRecipesByIngredients(ingredients, strictIngredients);
+      } else if (query.length > 0) {
+        foundRecipes = await searchRecipesByName(query);
+      } else {
+        setError('Введите хотя бы один ингредиент или название блюда.');
+        setRecipes([]);
+        return;
       }
-    } catch (e) {
-      setError('Ошибка поиска рецептов. Проверьте интернет и API ключи.');
-      console.error(e);
+
+      if (foundRecipes.length > 0) {
+        const translatedTitles = await translateRecipeTitlesToRussian(
+          foundRecipes.map((item) => item.name)
+        );
+        foundRecipes = foundRecipes.map((item, index) => ({
+          ...item,
+          name: translatedTitles[index] || item.name,
+        }));
+      }
+
+      setRecipes(foundRecipes);
+
+      if (!strictIngredients && foundRecipes.length === 0 && ingredients.length > 0) {
+        const detailed = await generateRecipeFromIngredients(ingredients);
+        if (detailed) {
+          setAiRecipe(detailedRecipeToCard(detailed));
+        } else {
+          setError('Не удалось составить рецепт по этим продуктам. Попробуйте уточнить список ингредиентов.');
+        }
+      }
+    } catch (searchError) {
+      console.error(searchError);
+      setError(searchError instanceof Error ? searchError.message : 'Произошла ошибка поиска рецептов.');
+      setRecipes([]);
     } finally {
       setLoading(false);
       setSortOpen(false);
+      setSuggestions([]);
     }
   };
 
@@ -152,16 +210,10 @@ const RecipesScreen = () => {
     });
 
     const clone = [...filtered];
-    if (sortMode === 'time') {
-      clone.sort((a, b) => a.cookingTime - b.cookingTime);
-    }
-    if (sortMode === 'servings') {
-      clone.sort((a, b) => b.servings - a.servings);
-    }
+    if (sortMode === 'time') clone.sort((a, b) => a.cookingTime - b.cookingTime);
+    if (sortMode === 'servings') clone.sort((a, b) => b.servings - a.servings);
     return clone;
   }, [recipes, sortMode, isVegan, isVegetarian, isGlutenFree, isDairyFree, isFried, isBoiled, isBaked]);
-
-  const quickHint = QUICK_PRODUCTS.join(', ');
 
   useEffect(() => {
     if ((initialQuery && initialQuery.trim()) || initialIngredients.length > 0) {
@@ -170,80 +222,162 @@ const RecipesScreen = () => {
   }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}> 
-      <Text style={[styles.headline, { color: colors.text }]}>Найди рецепт по продуктам или названию</Text>
-      <Text style={[styles.subHeadline, { color: colors.tabBarInactive }]}>Пример: курица, грибы, сливки</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinearGradient
+        colors={theme === 'dark' ? ['#2D221C', '#211813', '#18221A'] : ['#FFF5EA', '#F6E5D4', '#E7EFE6']}
+        style={[styles.hero, { borderColor: colors.border }]}
+      >
+        <Text style={[styles.headline, { color: colors.text }]}>Поиск</Text>
+      </LinearGradient>
 
-      <View style={[styles.controlsCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+      <View style={[styles.controlsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.searchRow}>
-        <TextInput
-          style={[styles.searchInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.card }]}
-          placeholder="Введите продукт"
-          placeholderTextColor={colors.tabBarInactive}
-          value={searchText}
-          onChangeText={setSearchText}
-          onSubmitEditing={handleSearch}
-          returnKeyType="search"
-        />
-        <TouchableOpacity style={[styles.searchButton, { backgroundColor: colors.primary }]} onPress={handleSearch}>
-          <Text style={styles.searchButtonText}>Искать</Text>
-        </TouchableOpacity>
+          <TextInput
+            style={[
+              styles.searchInput,
+              { borderColor: colors.border, color: colors.text, backgroundColor: colors.card },
+            ]}
+            placeholder={selectedIngredients.length > 0 ? 'Добавьте еще продукт' : 'Например: рис'}
+            placeholderTextColor={colors.tabBarInactive}
+            value={searchText}
+            onChangeText={(value) => {
+              setSearchText(value);
+              updateSuggestions(value);
+            }}
+            onSubmitEditing={submitIngredientInput}
+            returnKeyType="done"
+          />
+          <TouchableOpacity
+            style={[styles.searchButton, { backgroundColor: colors.primary }]}
+            onPress={searchText.trim() ? submitIngredientInput : handleSearch}
+          >
+            <Text style={styles.searchButtonText}>{searchText.trim() ? '+' : 'Искать'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.optionsButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => setSortOpen((prev) => !prev)}
+          >
+            <Ionicons name="ellipsis-vertical" size={20} color={colors.text} />
+            {activeFiltersCount > 0 && (
+              <View style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
+                <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={[styles.sortButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-          onPress={() => setSortOpen((prev) => !prev)}
-        >
-          <Text style={{ color: colors.text }}>{SORT_OPTIONS.find((item) => item.key === sortMode)?.label}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {sortOpen && (
-        <View style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-          {SORT_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option.key}
-              style={styles.dropdownItem}
-              onPress={() => {
-                setSortMode(option.key);
-                setSortOpen(false);
-              }}
-            >
-              <Text style={{ color: option.key === sortMode ? colors.primary : colors.text }}>{option.label}</Text>
+        {selectedIngredients.length > 0 && (
+          <View style={styles.selectedSummaryRow}>
+            <View style={styles.selectedSummaryLeft}>
+              <Ionicons name="basket-outline" size={16} color={colors.primary} />
+              <Text style={[styles.selectedSummaryText, { color: colors.tabBarInactive }]}>
+                Выбрано продуктов: {selectedIngredients.length}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={clearSelectedIngredients}>
+              <Text style={[styles.clearSelectedText, { color: colors.primary }]}>Очистить</Text>
             </TouchableOpacity>
-          ))}
-        </View>
-      )}
+          </View>
+        )}
 
-      <View style={styles.filtersWrap}>
-        <FilterChip label="Веган" active={isVegan} onPress={() => setIsVegan((v) => !v)} colors={colors} />
-        <FilterChip label="Вегетарианское" active={isVegetarian} onPress={() => setIsVegetarian((v) => !v)} colors={colors} />
-        <FilterChip label="Без глютена" active={isGlutenFree} onPress={() => setIsGlutenFree((v) => !v)} colors={colors} />
-        <FilterChip label="Без молока" active={isDairyFree} onPress={() => setIsDairyFree((v) => !v)} colors={colors} />
-        <FilterChip label="Жареное" active={isFried} onPress={() => setIsFried((v) => !v)} colors={colors} />
-        <FilterChip label="Вареное" active={isBoiled} onPress={() => setIsBoiled((v) => !v)} colors={colors} />
-        <FilterChip label="В духовке" active={isBaked} onPress={() => setIsBaked((v) => !v)} colors={colors} />
+        {suggestions.length > 0 && (
+          <View
+            style={[
+              styles.suggestionsBox,
+              { backgroundColor: colors.background, borderColor: colors.border },
+            ]}
+          >
+            {suggestions.map((item, index) => (
+              <Pressable
+                key={item}
+                style={[
+                  styles.suggestionItem,
+                  index === suggestions.length - 1 && styles.suggestionItemLast,
+                ]}
+                onPress={() => addIngredient(item)}
+              >
+                <Text style={{ color: colors.text }}>{item}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {sortOpen && (
+          <View style={[styles.optionsPanel, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <Text style={[styles.optionsTitle, { color: colors.text }]}>Сортировка</Text>
+            {SORT_OPTIONS.map((option) => (
+              <TouchableOpacity
+                key={option.key}
+                style={[
+                  styles.optionRow,
+                  sortMode === option.key && { backgroundColor: colors.primary + '18' },
+                ]}
+                onPress={() => setSortMode(option.key)}
+              >
+                <Text style={{ color: sortMode === option.key ? colors.primary : colors.text }}>
+                  {option.label}
+                </Text>
+                {sortMode === option.key && (
+                  <Ionicons name="checkmark" size={18} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+
+            <Text style={[styles.optionsTitle, { color: colors.text }]}>Фильтры</Text>
+            <View style={styles.filtersMenuWrap}>
+              <FilterChip label="Веган" active={isVegan} onPress={() => setIsVegan((v) => !v)} colors={colors} />
+              <FilterChip
+                label="Вегетарианское"
+                active={isVegetarian}
+                onPress={() => setIsVegetarian((v) => !v)}
+                colors={colors}
+              />
+              <FilterChip
+                label="Без глютена"
+                active={isGlutenFree}
+                onPress={() => setIsGlutenFree((v) => !v)}
+                colors={colors}
+              />
+              <FilterChip
+                label="Без молока"
+                active={isDairyFree}
+                onPress={() => setIsDairyFree((v) => !v)}
+                colors={colors}
+              />
+              <FilterChip label="Жареное" active={isFried} onPress={() => setIsFried((v) => !v)} colors={colors} />
+              <FilterChip label="Вареное" active={isBoiled} onPress={() => setIsBoiled((v) => !v)} colors={colors} />
+              <FilterChip label="В духовке" active={isBaked} onPress={() => setIsBaked((v) => !v)} colors={colors} />
+            </View>
+          </View>
+        )}
       </View>
-
-      {!loading && recipes.length === 0 && !error && (
-        <View style={[styles.emptyHintWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.hintText, { color: colors.tabBarInactive }]}>Примеры для поиска: {quickHint}</Text>
-        </View>
-      )}
 
       {loading && (
         <View style={styles.centerWrap}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ color: colors.text, marginTop: 10 }}>Ищем рецепты...</Text>
+          <Text style={{ color: colors.text, marginTop: 10 }}>Подбираем рецепты...</Text>
         </View>
       )}
 
       {!loading && error && (
         <View style={styles.centerWrap}>
           <Text style={{ color: colors.error, textAlign: 'center', marginBottom: 10 }}>{error}</Text>
-          <TouchableOpacity style={[styles.searchButton, { backgroundColor: colors.primary }]} onPress={handleSearch}>
+          <TouchableOpacity
+            style={[styles.searchButton, { backgroundColor: colors.primary }]}
+            onPress={handleSearch}
+          >
             <Text style={styles.searchButtonText}>Повторить</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {!loading && aiRecipe && !error && (
+        <View style={styles.aiSection}>
+          <Text style={[styles.aiTitle, { color: colors.text }]}>Полный рецепт по вашим продуктам</Text>
+          <RecipeCard
+            recipe={aiRecipe}
+            onPress={() => navigation.navigate('RecipeDetail', { recipe: aiRecipe })}
+          />
         </View>
       )}
 
@@ -259,6 +393,21 @@ const RecipesScreen = () => {
             />
           )}
           contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            !aiRecipe ? (
+              <View style={styles.centerWrap}>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                  {strictIngredients ? 'Точных рецептов пока нет' : 'Ничего не найдено'}
+                </Text>
+                <Text style={[styles.emptyText, { color: colors.tabBarInactive }]}>
+                  {strictIngredients
+                    ? 'В режиме холодильника показываются только блюда из выбранных вами продуктов. Добавьте еще ингредиенты или попробуйте другой набор.'
+                    : 'Попробуйте уточнить запрос, изменить фильтры или выбрать другие продукты.'}
+                </Text>
+              </View>
+            ) : null
+          }
         />
       )}
     </View>
@@ -268,34 +417,36 @@ const RecipesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 12,
+    paddingTop: 8,
+  },
+  hero: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   headline: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginHorizontal: 12,
-    marginBottom: 8,
-  },
-  subHeadline: {
-    marginHorizontal: 12,
-    marginBottom: 8,
+    fontSize: 22,
+    fontWeight: '800',
   },
   controlsCard: {
     marginHorizontal: 12,
     padding: 10,
     borderWidth: 1,
-    borderRadius: 14,
-    marginBottom: 8,
+    borderRadius: 16,
+    marginBottom: 6,
   },
   searchRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   searchInput: {
     flex: 1,
-    height: 46,
+    height: 48,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -304,58 +455,104 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchButton: {
-    height: 46,
-    borderRadius: 12,
+    height: 48,
+    borderRadius: 14,
     paddingHorizontal: 16,
     justifyContent: 'center',
   },
   searchButtonText: {
-    color: 'white',
+    color: '#11151d',
     fontWeight: '700',
   },
-  sortButton: {
-    marginTop: 10,
+  optionsButton: {
+    width: 44,
+    height: 48,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  dropdown: {
-    marginHorizontal: 12,
-    marginTop: 6,
+  filterBadge: {
+    position: 'absolute',
+    right: 6,
+    top: 5,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadgeText: {
+    color: '#11151d',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  suggestionsBox: {
+    marginTop: 10,
     borderWidth: 1,
     borderRadius: 12,
     overflow: 'hidden',
   },
-  dropdownItem: {
+  suggestionItem: {
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#ececec',
   },
-  filtersWrap: {
+  suggestionItemLast: {
+    borderBottomWidth: 0,
+  },
+  selectedSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingHorizontal: 2,
+  },
+  selectedSummaryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  selectedSummaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  clearSelectedText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  optionsPanel: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 10,
+  },
+  optionsTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  optionRow: {
+    minHeight: 38,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  filtersMenuWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginHorizontal: 12,
-    marginTop: 8,
   },
   filterChip: {
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 999,
     paddingVertical: 8,
     paddingHorizontal: 12,
-  },
-  hintText: {
-    lineHeight: 20,
-  },
-  emptyHintWrap: {
-    marginHorizontal: 12,
-    marginTop: 8,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
   },
   centerWrap: {
     flex: 1,
@@ -363,9 +560,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
   },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  emptyText: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
   listContent: {
     paddingTop: 8,
     paddingBottom: 16,
+  },
+  aiSection: {
+    paddingTop: 8,
+  },
+  aiTitle: {
+    marginHorizontal: 16,
+    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '800',
   },
 });
 

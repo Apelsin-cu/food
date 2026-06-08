@@ -1,209 +1,101 @@
-import axios from 'axios';
-import { API_KEY, BASE_URL } from '../constants/Api';
 import { Recipe } from '../types/recipe';
+import { apiClient, ensureApiConfigured } from './http';
+import {
+  findLocalRecipesByIngredients,
+  isLocalRecipe,
+  getLocalIngredientSuggestions,
+  getLocalRecommendedRecipes,
+  searchLocalRecipesByName,
+} from './localRecipeService';
 
-export interface RecipeStepVisual {
-  text: string;
-  imageUrl?: string;
+interface RecipesResponse {
+  recipes: Recipe[];
 }
 
-const INGREDIENT_TRANSLATIONS: Record<string, string> = {
-  картофель: 'potato',
-  лук: 'onion',
-  чеснок: 'garlic',
-  морковь: 'carrot',
-  помидор: 'tomato',
-  томат: 'tomato',
-  огурец: 'cucumber',
-  курица: 'chicken',
-  говядина: 'beef',
-  свинина: 'pork',
-  рыба: 'fish',
-  яйца: 'eggs',
-  яйцо: 'egg',
-  молоко: 'milk',
-  сыр: 'cheese',
-  масло: 'butter',
-  рис: 'rice',
-  макароны: 'pasta',
-  гречка: 'buckwheat',
-  хлеб: 'bread',
-  капуста: 'cabbage',
-  перец: 'pepper',
-  грибы: 'mushrooms',
-};
+interface StepVisualsResponse {
+  visuals: {
+    text: string;
+    imageUrl?: string;
+  }[];
+}
 
-const normalizeIngredient = (value: string): string => {
-  const normalized = value.trim().toLowerCase();
-  return INGREDIENT_TRANSLATIONS[normalized] || normalized;
-};
-
-const resolveRecipeImage = (recipe: any): string => {
-  if (typeof recipe.image === 'string' && recipe.image.startsWith('http')) {
-    return recipe.image;
-  }
-
-  if (recipe.id) {
-    return `https://spoonacular.com/recipeImages/${recipe.id}-636x393.jpg`;
-  }
-
-  return '';
-};
-
-const apiClient = axios.create({
-  baseURL: BASE_URL,
-  params: {
-    apiKey: API_KEY,
-  },
+const sanitizeRecipe = (recipe: Recipe): Recipe => ({
+  ...recipe,
+  ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
+  instructions: Array.isArray(recipe.instructions) ? recipe.instructions : [],
+  imageUrl: typeof recipe.imageUrl === 'string' ? recipe.imageUrl : '',
 });
 
-const mapRecipe = (recipe: any): Recipe => ({
-  id: recipe.id,
-  name: recipe.title,
-  imageUrl: resolveRecipeImage(recipe),
-  cookingTime: recipe.readyInMinutes || 30,
-  servings: recipe.servings || 2,
-  ingredients: recipe.extendedIngredients?.map((ing: any) => ing.original) || [],
-  instructions: recipe.analyzedInstructions?.[0]?.steps.map((step: any) => step.step) || [],
-  isVegan: Boolean(recipe.vegan),
-  isGlutenFree: Boolean(recipe.glutenFree),
-  isVegetarian: Boolean(recipe.vegetarian),
-  isDairyFree: Boolean(recipe.dairyFree),
-});
+export const findRecipesByIngredients = async (
+  ingredients: string[],
+  strictIngredients = false
+): Promise<Recipe[]> => {
+  const localRecipes = findLocalRecipesByIngredients(ingredients, strictIngredients);
 
-export const findRecipesByIngredients = async (ingredients: string[]): Promise<Recipe[]> => {
+  if (localRecipes.length > 0) {
+    return localRecipes.map(sanitizeRecipe);
+  }
+
+  if (strictIngredients) {
+    return [];
+  }
+
   try {
-    if (!API_KEY) {
-      throw new Error('Spoonacular API key is not configured');
-    }
-
-    const normalizedIngredients = ingredients
-      .map(normalizeIngredient)
-      .filter(Boolean);
-
-    if (normalizedIngredients.length === 0) {
-      return [];
-    }
-
-    const response = await apiClient.get('/recipes/findByIngredients', {
+    ensureApiConfigured();
+    const response = await apiClient.get<RecipesResponse>('/recipes/by-ingredients', {
       params: {
-        ingredients: normalizedIngredients.join(','),
-        number: 12,
-        ranking: 2,
-        ignorePantry: true,
+        ingredients: ingredients.join(','),
       },
     });
 
-    if (response.data && response.data.length > 0) {
-      const recipeIds = response.data.map((recipe: any) => recipe.id);
-      return getRecipeInformationBulk(recipeIds);
-    }
-    return [];
+    return Array.isArray(response.data?.recipes)
+      ? response.data.recipes.map(sanitizeRecipe)
+      : [];
   } catch (error) {
     console.error('Error finding recipes by ingredients:', error);
-    throw error;
+    return localRecipes;
   }
 };
 
-export const getRecipeInformationBulk = async (ids: number[]): Promise<Recipe[]> => {
-  try {
-    if (ids.length === 0) {
-      return [];
-    }
-
-    const response = await apiClient.get('/recipes/informationBulk', {
-      params: {
-        ids: ids.join(','),
-        includeNutrition: false,
-      },
-    });
-    return response.data.map(mapRecipe).filter((recipe: Recipe) => Boolean(recipe.name) && Boolean(recipe.imageUrl));
-  } catch (error) {
-    console.error('Error getting recipe information:', error);
-    throw error;
-  }
-};
-
-/**
- * Поиск рецептов по названию.
- * @param query - Название рецепта для поиска.
- * @returns Массив найденных рецептов.
- */
 export const searchRecipesByName = async (query: string): Promise<Recipe[]> => {
+  const localRecipes = searchLocalRecipesByName(query);
+
+  if (localRecipes.length > 0) {
+    return localRecipes.map(sanitizeRecipe);
+  }
+
   try {
-    if (!API_KEY) {
-      throw new Error('Spoonacular API key is not configured');
-    }
-
-    const cleanQuery = query.trim();
-    if (!cleanQuery) {
-      return [];
-    }
-
-    const response = await apiClient.get('/recipes/complexSearch', {
-      params: {
-        query: cleanQuery,
-        number: 10,
-        addRecipeInformation: true,
-        fillIngredients: true,
-      },
+    ensureApiConfigured();
+    const response = await apiClient.get<RecipesResponse>('/recipes/search', {
+      params: { query },
     });
 
-    if (response.data && response.data.results && response.data.results.length > 0) {
-      return response.data.results.map(mapRecipe).filter((recipe: Recipe) => Boolean(recipe.name) && Boolean(recipe.imageUrl));
-    }
-    return [];
+    return Array.isArray(response.data?.recipes)
+      ? response.data.recipes.map(sanitizeRecipe)
+      : [];
   } catch (error) {
     console.error('Error searching recipes by name:', error);
-    throw error;
+    return localRecipes;
   }
 };
 
 export const getRecommendedRecipes = async (): Promise<Recipe[]> => {
-  try {
-    if (!API_KEY) {
-      throw new Error('Spoonacular API key is not configured');
-    }
-
-    const response = await apiClient.get('/recipes/random', {
-      params: {
-        number: 10,
-      },
-    });
-
-    return (response.data?.recipes || [])
-      .map(mapRecipe)
-      .filter((recipe: Recipe) => Boolean(recipe.name) && Boolean(recipe.imageUrl));
-  } catch (error) {
-    console.error('Error loading recommendations:', error);
-    throw error;
-  }
+  return getLocalRecommendedRecipes();
 };
 
-export const getRecipeStepVisuals = async (recipeId: number): Promise<RecipeStepVisual[]> => {
+export const getRecipeStepVisuals = async (recipeId: number) => {
+  if (isLocalRecipe(recipeId)) {
+    return [];
+  }
+
   try {
-    if (!API_KEY) {
-      throw new Error('Spoonacular API key is not configured');
-    }
-
-    const response = await apiClient.get(`/recipes/${recipeId}/analyzedInstructions`);
-    const steps = response.data?.[0]?.steps || [];
-
-    return steps.map((step: any) => {
-      const equipmentImage = step?.equipment?.[0]?.image
-        ? `https://spoonacular.com/cdn/equipment_500x500/${step.equipment[0].image}`
-        : undefined;
-      const ingredientImage = step?.ingredients?.[0]?.image
-        ? `https://spoonacular.com/cdn/ingredients_500x500/${step.ingredients[0].image}`
-        : undefined;
-
-      return {
-        text: step.step,
-        imageUrl: equipmentImage || ingredientImage,
-      };
-    });
+    ensureApiConfigured();
+    const response = await apiClient.get<StepVisualsResponse>(`/recipes/${recipeId}/step-visuals`);
+    return Array.isArray(response.data?.visuals) ? response.data.visuals : [];
   } catch (error) {
     console.error('Error loading recipe step visuals:', error);
     return [];
   }
 };
+
+export const getLocalQuickProducts = () => getLocalIngredientSuggestions();

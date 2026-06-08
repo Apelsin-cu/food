@@ -44,3 +44,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local build/cache artifacts
+.gradle-user/
+server.log
+server.err

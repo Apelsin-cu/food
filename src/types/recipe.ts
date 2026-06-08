@@ -10,4 +10,6 @@ export interface Recipe {
   isGlutenFree: boolean;
   isVegetarian: boolean;
   isDairyFree: boolean;
+  sourceName?: string;
+  sourceUrl?: string;
 }

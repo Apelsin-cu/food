@@ -2,7 +2,13 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import RecipeCard from '../components/RecipeCard';
 import { ThemeContext } from '../context/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -12,16 +18,16 @@ import { Recipe } from '../types/recipe';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
-const QUICK_QUERY = ['Быстрый ужин', 'Суп', 'Курица', 'Паста'];
-
 const HomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  const { colors } = useContext(ThemeContext);
+  const { colors, theme } = useContext(ThemeContext);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadRecommendations = async () => {
     setLoading(true);
+    setError(null);
     try {
       const recommended = await getRecommendedRecipes();
       const translatedTitles = await translateRecipeTitlesToRussian(
@@ -32,8 +38,9 @@ const HomeScreen = () => {
         name: translatedTitles[index] || recipe.name,
       }));
       setRecipes(localized);
-    } catch (error) {
-      console.error(error);
+    } catch (loadError) {
+      console.error(loadError);
+      setError(loadError instanceof Error ? loadError.message : 'Не удалось загрузить рекомендации.');
     } finally {
       setLoading(false);
     }
@@ -45,56 +52,47 @@ const HomeScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={[colors.primary + '24', colors.accent + '22', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.primary }]}>Рекомендации на сегодня</Text>
-          <Text style={[styles.subtitle, { color: colors.tabBarInactive }]}>Идеи блюд под настроение и сезон</Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.searchButton, { backgroundColor: colors.primary }]}
-          onPress={() => navigation.navigate('Recipes')}
-        >
-          <Text style={styles.searchButtonText}>Открыть поиск рецептов</Text>
-        </TouchableOpacity>
-
-        <View style={styles.quickRow}>
-          {QUICK_QUERY.map((item) => (
-            <TouchableOpacity
-              key={item}
-              style={[styles.quickChip, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => navigation.navigate('Recipes', { initialQuery: item })}
+      <FlatList
+        data={recipes}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item, index }) => (
+          <RecipeCard
+            recipe={item}
+            onPress={() => navigation.navigate('RecipeDetail', { recipe: item })}
+            index={index}
+          />
+        )}
+        ListHeaderComponent={
+          <>
+            <LinearGradient
+              colors={theme === 'dark' ? ['#2D221C', '#211813', '#18221A'] : ['#FFF5EA', '#F6E6D6', '#E8F0E6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.hero, { borderColor: colors.border }]}
             >
-              <Text style={{ color: colors.text }}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </LinearGradient>
+              <Text style={[styles.kicker, { color: colors.accent }]}>FlavorFinder</Text>
+              <Text style={[styles.title, { color: colors.text }]}>Что приготовить сегодня</Text>
+            </LinearGradient>
 
-      {loading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ color: colors.text, marginTop: 12 }}>Загружаем рекомендации...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={recipes}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item, index }) => (
-            <RecipeCard
-              recipe={item}
-              onPress={() => navigation.navigate('RecipeDetail', { recipe: item })}
-              index={index}
-            />
-          )}
-          contentContainerStyle={styles.listContainer}
-        />
-      )}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Разнообразные рецепты</Text>
+            </View>
+          </>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loaderWrap}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={{ color: colors.tabBarInactive, marginTop: 12 }}>Загружаем рекомендации...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.loaderWrap}>
+              <Text style={{ color: colors.error, textAlign: 'center', paddingHorizontal: 20 }}>{error}</Text>
+            </View>
+          ) : null
+        }
+        contentContainerStyle={styles.listContainer}
+      />
     </View>
   );
 };
@@ -104,56 +102,48 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   hero: {
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    paddingBottom: 14,
-    marginBottom: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 4,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 18,
+  kicker: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   title: {
-    fontSize: 26,
+    marginTop: 8,
+    fontSize: 31,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+  },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 4,
+  },
+  sectionTitle: {
+    fontSize: 22,
     fontWeight: '800',
   },
-  subtitle: {
-    marginTop: 6,
-    fontSize: 15,
-  },
-  searchButton: {
-    marginHorizontal: 16,
-    marginTop: 14,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  quickRow: {
-    marginTop: 12,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  quickChip: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  searchButtonText: {
-    color: 'white',
-    fontSize: 15,
-    fontWeight: '700',
-  },
   listContainer: {
-    paddingTop: 10,
-    paddingBottom: 16,
+    paddingBottom: 18,
   },
   loaderWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingTop: 32,
   },
 });
 

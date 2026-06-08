@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1700" viewBox="0 0 1400 1700">
+  <defs>
+    <pattern id="smallGrid" width="10" height="10" patternUnits="userSpaceOnUse">
+      <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#eeeeee" stroke-width="1"/>
+    </pattern>
+    <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+      <rect width="50" height="50" fill="url(#smallGrid)"/>
+      <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#dddddd" stroke-width="1.2"/>
+    </pattern>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#111"/>
+    </marker>
+    <style>
+      .grid-bg { fill: url(#grid); }
+      .shape { fill: #fff; stroke: #111; stroke-width: 2; }
+      .line { stroke: #111; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .dashed { stroke: #111; stroke-width: 2; fill: none; stroke-dasharray: 10 8; marker-end: url(#arrow); }
+      .text { font-family: "Segoe UI", Arial, sans-serif; font-size: 20px; fill: #111; }
+      .small { font-family: "Segoe UI", Arial, sans-serif; font-size: 17px; fill: #111; }
+      .label { font-family: "Segoe UI", Arial, sans-serif; font-size: 17px; fill: #111; }
+      .title { font-family: "Segoe UI", Arial, sans-serif; font-size: 24px; font-weight: 600; fill: #111; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="1700" class="grid-bg"/>
+  <text x="700" y="45" text-anchor="middle" class="title">Блок-схема алгоритма работы приложения FlavorFinder</text>
+
+  <!-- Start -->
+  <ellipse cx="700" cy="115" rx="70" ry="55" class="shape"/>
+  <text x="700" y="122" text-anchor="middle" class="text">НАЧАЛО</text>
+  <path d="M700 170 L700 225" class="line"/>
+
+  <!-- Open app -->
+  <rect x="570" y="225" width="260" height="80" class="shape"/>
+  <text x="700" y="258" text-anchor="middle" class="text">Запуск</text>
+  <text x="700" y="284" text-anchor="middle" class="text">приложения</text>
+  <path d="M700 305 L700 360" class="line"/>
+
+  <!-- Main screen -->
+  <rect x="540" y="360" width="320" height="90" class="shape"/>
+  <text x="700" y="395" text-anchor="middle" class="text">Главный экран</text>
+  <text x="700" y="423" text-anchor="middle" class="small">разнообразные рецепты</text>
+  <path d="M700 450 L700 505" class="line"/>
+
+  <!-- User action -->
+  <polygon points="700,505 820,585 700,665 580,585" class="shape"/>
+  <text x="700" y="575" text-anchor="middle" class="small">Выбран</text>
+  <text x="700" y="598" text-anchor="middle" class="small">раздел?</text>
+
+  <!-- Favorites branch -->
+  <path d="M580 585 L330 585 L330 725" class="line"/>
+  <text x="410" y="560" class="label">Избранное</text>
+  <rect x="200" y="725" width="260" height="90" class="shape"/>
+  <text x="330" y="760" text-anchor="middle" class="text">Экран</text>
+  <text x="330" y="788" text-anchor="middle" class="text">избранного</text>
+  <path d="M330 815 L330 1560 L610 1560" class="line"/>
+
+  <!-- Recommendations branch -->
+  <path d="M820 585 L1070 585 L1070 725" class="line"/>
+  <text x="955" y="560" class="label">Рекомендации</text>
+  <rect x="930" y="725" width="280" height="90" class="shape"/>
+  <text x="1070" y="760" text-anchor="middle" class="text">Просмотр</text>
+  <text x="1070" y="788" text-anchor="middle" class="text">карточек рецептов</text>
+  <path d="M1070 815 L1070 1010" class="line"/>
+
+  <!-- Fridge path -->
+  <path d="M700 665 L700 725" class="line"/>
+  <text x="720" y="700" class="label">Мой холодильник</text>
+  <rect x="535" y="725" width="330" height="90" class="shape"/>
+  <text x="700" y="760" text-anchor="middle" class="text">Окно выбора</text>
+  <text x="700" y="788" text-anchor="middle" class="text">продуктов</text>
+  <path d="M700 815 L700 875" class="line"/>
+
+  <rect x="515" y="875" width="370" height="95" class="shape"/>
+  <text x="700" y="910" text-anchor="middle" class="text">Ввод продукта</text>
+  <text x="700" y="938" text-anchor="middle" class="small">или выбор русской подсказки</text>
+  <path d="M700 970 L700 1030" class="line"/>
+
+  <!-- Data storage cylinder products -->
+  <path d="M555 1015 C555 985 645 985 645 1015 L645 1080 C645 1110 555 1110 555 1080 Z" class="shape"/>
+  <ellipse cx="600" cy="1015" rx="45" ry="18" class="shape"/>
+  <text x="600" y="1054" text-anchor="middle" class="small">Список</text>
+  <text x="600" y="1076" text-anchor="middle" class="small">продуктов</text>
+  <path d="M650 1025 L700 1030" class="line"/>
+
+  <!-- Products selected? -->
+  <polygon points="700,1030 830,1110 700,1190 570,1110" class="shape"/>
+  <text x="700" y="1100" text-anchor="middle" class="small">Продукты</text>
+  <text x="700" y="1123" text-anchor="middle" class="small">выбраны?</text>
+
+  <!-- No products -->
+  <path d="M570 1110 L420 1110 L420 990 L515 990" class="dashed"/>
+  <text x="465" y="1085" class="label">Нет</text>
+  <polygon points="190,1080 440,1080 410,1150 160,1150" class="shape"/>
+  <text x="300" y="1115" text-anchor="middle" class="small">Сообщение:</text>
+  <text x="300" y="1138" text-anchor="middle" class="small">добавьте продукт</text>
+  <path d="M420 1110 L440 1110" class="line"/>
+
+  <!-- Yes products -->
+  <path d="M700 1190 L700 1250" class="line"/>
+  <text x="720" y="1225" class="label">Да</text>
+  <rect x="540" y="1250" width="320" height="90" class="shape"/>
+  <text x="700" y="1285" text-anchor="middle" class="text">Поиск рецептов</text>
+  <text x="700" y="1313" text-anchor="middle" class="small">по выбранным продуктам</text>
+  <path d="M700 1340 L700 1405" class="line"/>
+
+  <!-- Local recipes decision -->
+  <polygon points="700,1405 835,1485 700,1565 565,1485" class="shape"/>
+  <text x="700" y="1475" text-anchor="middle" class="small">Есть рецепт</text>
+  <text x="700" y="1498" text-anchor="middle" class="small">в локальной базе?</text>
+
+  <!-- Local DB -->
+  <path d="M565 1485 L385 1485" class="line"/>
+  <text x="475" y="1462" class="label">Да</text>
+  <path d="M205 1440 C205 1405 385 1405 385 1440 L385 1510 C385 1545 205 1545 205 1510 Z" class="shape"/>
+  <ellipse cx="295" cy="1440" rx="90" ry="24" class="shape"/>
+  <text x="295" y="1474" text-anchor="middle" class="small">Локальная база</text>
+  <text x="295" y="1497" text-anchor="middle" class="small">15 рецептов Food.ru</text>
+  <path d="M385 1485 L565 1485" class="line"/>
+
+  <!-- Backend branch -->
+  <path d="M835 1485 L1010 1485 L1010 1325" class="line"/>
+  <text x="900" y="1462" class="label">Нет</text>
+  <rect x="900" y="1235" width="280" height="90" class="shape"/>
+  <text x="1040" y="1270" text-anchor="middle" class="text">Запрос</text>
+  <text x="1040" y="1298" text-anchor="middle" class="text">к backend API</text>
+  <path d="M1040 1235 L1040 1140" class="line"/>
+
+  <rect x="900" y="1050" width="280" height="90" class="shape"/>
+  <text x="1040" y="1085" text-anchor="middle" class="small">Spoonacular API</text>
+  <text x="1040" y="1110" text-anchor="middle" class="small">поиск внешних рецептов</text>
+  <path d="M1180 1095 L1260 1095 L1260 1310 L860 1310" class="line"/>
+
+  <!-- Results -->
+  <path d="M700 1565 L700 1615" class="line"/>
+  <rect x="555" y="1615" width="290" height="80" class="shape"/>
+  <text x="700" y="1646" text-anchor="middle" class="text">Список найденных</text>
+  <text x="700" y="1672" text-anchor="middle" class="text">рецептов</text>
+
+  <!-- Since canvas ends at 1700, detail branch placed right side -->
+  <path d="M845 1655 L1210 1655 L1210 1450" class="line"/>
+  <rect x="1075" y="1360" width="270" height="90" class="shape"/>
+  <text x="1210" y="1395" text-anchor="middle" class="text">Выбор рецепта</text>
+  <text x="1210" y="1423" text-anchor="middle" class="text">из списка</text>
+  <path d="M1210 1360 L1210 1260" class="line"/>
+
+  <rect x="1075" y="1170" width="270" height="90" class="shape"/>
+  <text x="1210" y="1205" text-anchor="middle" class="text">Окно деталей</text>
+  <text x="1210" y="1233" text-anchor="middle" class="small">ингредиенты и шаги</text>
+  <path d="M1210 1170 L1210 1045" class="line"/>
+
+  <!-- Images decision -->
+  <polygon points="1210,885 1335,965 1210,1045 1085,965" class="shape"/>
+  <text x="1210" y="955" text-anchor="middle" class="small">Фото шага</text>
+  <text x="1210" y="978" text-anchor="middle" class="small">есть в Food.ru?</text>
+
+  <path d="M1085 965 L955 965 L955 890" class="line"/>
+  <text x="1005" y="943" class="label">Да</text>
+  <rect x="820" y="800" width="270" height="90" class="shape"/>
+  <text x="955" y="835" text-anchor="middle" class="text">Показ готового</text>
+  <text x="955" y="863" text-anchor="middle" class="text">изображения</text>
+
+  <path d="M1335 965 L1335 850" class="line"/>
+  <text x="1350" y="920" class="label">Нет</text>
+  <rect x="1200" y="760" width="270" height="90" class="shape"/>
+  <text x="1335" y="795" text-anchor="middle" class="small">Генерация фото</text>
+  <text x="1335" y="820" text-anchor="middle" class="small">OpenAI Images / DeepAI</text>
+  <path d="M1335 760 L1335 680" class="line"/>
+
+  <path d="M1260 650 C1260 620 1410 620 1410 650 L1410 705 C1410 735 1260 735 1260 705 Z" class="shape"/>
+  <ellipse cx="1335" cy="650" rx="75" ry="20" class="shape"/>
+  <text x="1335" y="683" text-anchor="middle" class="small">Кэш фото</text>
+  <text x="1335" y="706" text-anchor="middle" class="small">AsyncStorage</text>
+
+  <!-- Favorites save -->
+  <path d="M1075 1215 L930 1215 L930 1130" class="line"/>
+  <rect x="790" y="1040" width="280" height="90" class="shape"/>
+  <text x="930" y="1075" text-anchor="middle" class="text">Добавить</text>
+  <text x="930" y="1103" text-anchor="middle" class="text">в избранное</text>
+
+  <path d="M790 1085 L680 1085 L680 1010" class="line"/>
+  <path d="M610 950 C610 920 750 920 750 950 L750 1010 C750 1040 610 1040 610 1010 Z" class="shape"/>
+  <ellipse cx="680" cy="950" rx="70" ry="20" class="shape"/>
+  <text x="680" y="985" text-anchor="middle" class="small">Избранное</text>
+  <text x="680" y="1007" text-anchor="middle" class="small">AsyncStorage</text>
+
+  <!-- End -->
+  <path d="M1210 1260 L1210 1580 L790 1580 L790 1615" class="line"/>
+  <ellipse cx="1035" cy="1580" rx="70" ry="55" class="shape"/>
+  <text x="1035" y="1587" text-anchor="middle" class="text">КОНЕЦ</text>
+</svg>

@@ -1,0 +1,55 @@
+﻿<svg width="1080" height="1920" viewBox="0 0 1080 1920" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1080" y2="1920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#101416"/>
+      <stop offset="1" stop-color="#1A2326"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="120" y1="300" x2="930" y2="970" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#13B57D" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#FFB24A" stop-opacity="0.24"/>
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <rect width="1080" height="1920" fill="url(#bg)"/>
+  <rect x="70" y="90" width="940" height="1740" rx="58" fill="#141C1F" stroke="#2C393D" stroke-width="2" filter="url(#shadow)"/>
+
+  <text x="130" y="220" fill="#F2F6F7" font-size="38" font-family="Space Grotesk, Arial" font-weight="700">Dark Chef UI</text>
+  <text x="130" y="268" fill="#93A8AE" font-size="24" font-family="Manrope, Arial">Focused, premium and high-contrast</text>
+
+  <rect x="130" y="320" width="820" height="86" rx="28" fill="#1C272B" stroke="#2C393D"/>
+  <text x="170" y="373" fill="#81979D" font-size="28" font-family="Manrope, Arial">Search recipes...</text>
+
+  <rect x="130" y="450" width="820" height="520" rx="36" fill="#1A2428" stroke="#2C393D"/>
+  <rect x="162" y="482" width="756" height="290" rx="28" fill="url(#accent)"/>
+  <rect x="162" y="482" width="756" height="290" rx="28" fill="#31423F" fill-opacity="0.40"/>
+
+  <rect x="170" y="505" width="120" height="44" rx="16" fill="#13B57D"/>
+  <text x="198" y="535" fill="#FFFFFF" font-size="20" font-family="Manrope, Arial" font-weight="700">Vegan</text>
+
+  <rect x="804" y="505" width="98" height="44" rx="16" fill="#232F33" stroke="#2C393D"/>
+  <text x="834" y="535" fill="#FF6E6E" font-size="24" font-family="Manrope, Arial">♥</text>
+
+  <text x="180" y="835" fill="#F1F6F7" font-size="38" font-family="Space Grotesk, Arial" font-weight="700">Grilled Salmon Bowl</text>
+  <text x="180" y="882" fill="#96ACB2" font-size="24" font-family="Manrope, Arial">18 min   •   3 servings   •   510 kcal</text>
+
+  <rect x="130" y="1020" width="260" height="64" rx="22" fill="#13B57D" fill-opacity="0.16" stroke="#13B57D"/>
+  <text x="177" y="1062" fill="#33CC96" font-size="24" font-family="Manrope, Arial">Fast cook</text>
+  <rect x="410" y="1020" width="220" height="64" rx="22" fill="#FFB24A" fill-opacity="0.12" stroke="#FFB24A"/>
+  <text x="455" y="1062" fill="#FFC36A" font-size="24" font-family="Manrope, Arial">High protein</text>
+  <rect x="650" y="1020" width="300" height="64" rx="22" fill="#1E292D" stroke="#2F3D42"/>
+  <text x="710" y="1062" fill="#A6BAC0" font-size="24" font-family="Manrope, Arial">No lactose</text>
+
+  <rect x="130" y="1120" width="820" height="280" rx="30" fill="#182226" stroke="#2B383C"/>
+  <text x="180" y="1185" fill="#EFF5F6" font-size="32" font-family="Space Grotesk, Arial" font-weight="700">AI suggestions</text>
+  <text x="180" y="1232" fill="#8CA2A8" font-size="24" font-family="Manrope, Arial">Personalized by your fridge products</text>
+  <rect x="180" y="1270" width="320" height="88" rx="28" fill="#13B57D"/>
+  <text x="250" y="1324" fill="#0D1A17" font-size="26" font-family="Manrope, Arial" font-weight="800">Find recipes</text>
+
+  <rect x="210" y="1710" width="660" height="88" rx="34" fill="#1B2529" stroke="#2D3A3E"/>
+  <circle cx="330" cy="1754" r="16" fill="#13B57D"/>
+  <circle cx="540" cy="1754" r="16" fill="#71888F"/>
+  <circle cx="750" cy="1754" r="16" fill="#71888F"/>
+</svg>

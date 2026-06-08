@@ -1,25 +1,27 @@
-import { Link } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React from 'react';
-import { Platform } from 'react-native';
+import { Linking, Platform, Pressable, Text, TextStyle } from 'react-native';
 
 export function ExternalLink(
-  props: Omit<React.ComponentProps<typeof Link>, 'href'> & { href: string }
+  props: React.PropsWithChildren<{
+    href: string;
+    style?: TextStyle;
+  }>
 ) {
+  const { href, style, children } = props;
+
+  const handlePress = async () => {
+    if (Platform.OS === 'web') {
+      await Linking.openURL(href);
+      return;
+    }
+
+    await WebBrowser.openBrowserAsync(href);
+  };
+
   return (
-    <Link
-      target="_blank"
-      {...props}
-      // @ts-expect-error: External URLs are not typed.
-      href={props.href}
-      onPress={(e) => {
-        if (Platform.OS !== 'web') {
-          // Prevent the default behavior of linking to the default browser on native.
-          e.preventDefault();
-          // Open the link in an in-app browser.
-          WebBrowser.openBrowserAsync(props.href as string);
-        }
-      }}
-    />
+    <Pressable onPress={handlePress}>
+      <Text style={style}>{children}</Text>
+    </Pressable>
   );
 }

@@ -1,24 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import {
-    DEEPAI_API_KEY,
-    DEEPAI_IMAGE_API_URL,
-    OPENAI_API_KEY,
-    OPENAI_IMAGE_API_URL,
-} from '../constants/OpenAI';
+import { apiClient, ensureApiConfigured } from './http';
 
-const CACHE_PREFIX = '@FoodApp:stepImage:';
+const CACHE_PREFIX = '@FoodApp:stepImage:v2:';
 const SUCCESS_TTL_MS = 1000 * 60 * 60 * 24 * 30;
-const FAILURE_TTL_MS = 1000 * 60 * 60 * 12;
+const FAILURE_TTL_MS = 1000 * 30;
 
 interface CacheEntry {
   url: string | null;
   createdAt: number;
 }
 
-const buildPrompt = (stepText: string, recipeTitle: string, stepNumber: number): string => {
-  return `Фотореалистичное изображение этапа ${stepNumber} приготовления блюда \"${recipeTitle}\". Кулинарный процесс крупным планом, натуральный свет, современная кухня, без текста на изображении. Этап: ${stepText}`;
-};
+interface StepImageResponse {
+  imageUrl: string | null;
+}
+
+const HERO_CACHE_PREFIX = '@FoodApp:recipeImage:v2:';
 
 const hashText = (value: string): string => {
   let hash = 5381;
@@ -28,9 +24,19 @@ const hashText = (value: string): string => {
   return (hash >>> 0).toString(16);
 };
 
-const buildCacheKey = (recipeId: number, stepText: string, recipeTitle: string, stepNumber: number): string => {
+const buildCacheKey = (
+  recipeId: number,
+  stepText: string,
+  recipeTitle: string,
+  stepNumber: number
+): string => {
   const fingerprint = hashText(`${recipeTitle}|${stepNumber}|${stepText}`);
   return `${CACHE_PREFIX}${recipeId}:${stepNumber}:${fingerprint}`;
+};
+
+const buildHeroCacheKey = (recipeId: number, recipeTitle: string): string => {
+  const fingerprint = hashText(recipeTitle);
+  return `${HERO_CACHE_PREFIX}${recipeId}:${fingerprint}`;
 };
 
 const readCache = async (cacheKey: string): Promise<string | null | undefined> => {
@@ -72,73 +78,6 @@ const writeCache = async (cacheKey: string, url: string | null): Promise<void> =
   }
 };
 
-const generateWithDeepAI = async (prompt: string): Promise<string | null> => {
-  if (!DEEPAI_API_KEY) {
-    return null;
-  }
-
-  try {
-    const form = new FormData();
-    form.append('text', prompt);
-
-    const response = await axios.post(DEEPAI_IMAGE_API_URL, form, {
-      headers: {
-        'Api-Key': DEEPAI_API_KEY,
-        'Content-Type': 'multipart/form-data',
-      },
-      timeout: 60000,
-    });
-
-    const url = response.data?.output_url;
-    return typeof url === 'string' && url.length > 0 ? url : null;
-  } catch (error) {
-    console.error('DeepAI image generation failed:', error);
-    return null;
-  }
-};
-
-const generateWithOpenAI = async (prompt: string): Promise<string | null> => {
-  if (!OPENAI_API_KEY) {
-    return null;
-  }
-
-  try {
-    const response = await axios.post(
-      OPENAI_IMAGE_API_URL,
-      {
-        model: 'gpt-image-1',
-        prompt,
-        size: '1024x1024',
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 60000,
-      }
-    );
-
-    const first = response.data?.data?.[0];
-    if (!first) {
-      return null;
-    }
-
-    if (typeof first.url === 'string' && first.url.length > 0) {
-      return first.url;
-    }
-
-    if (typeof first.b64_json === 'string' && first.b64_json.length > 0) {
-      return `data:image/png;base64,${first.b64_json}`;
-    }
-
-    return null;
-  } catch (error) {
-    console.error('OpenAI image generation failed:', error);
-    return null;
-  }
-};
-
 export const getStepImageWithCache = async (
   recipeId: number,
   stepText: string,
@@ -151,15 +90,50 @@ export const getStepImageWithCache = async (
     return cached;
   }
 
-  const prompt = buildPrompt(stepText, recipeTitle, stepNumber);
+  try {
+    ensureApiConfigured();
+    const response = await apiClient.post<StepImageResponse>('/ai/step-image', {
+      recipeId,
+      stepText,
+      recipeTitle,
+      stepNumber,
+    });
 
-  const deepAiImage = await generateWithDeepAI(prompt);
-  if (deepAiImage) {
-    await writeCache(cacheKey, deepAiImage);
-    return deepAiImage;
+    const imageUrl = response.data?.imageUrl || null;
+    await writeCache(cacheKey, imageUrl);
+    return imageUrl;
+  } catch (error) {
+    console.error('Step image generation failed:', error);
+    await writeCache(cacheKey, null);
+    return null;
+  }
+};
+
+export const getRecipeImageWithCache = async (
+  recipeId: number,
+  recipeTitle: string,
+  ingredients: string[]
+): Promise<string | null> => {
+  const cacheKey = buildHeroCacheKey(recipeId, recipeTitle);
+  const cached = await readCache(cacheKey);
+  if (cached !== undefined) {
+    return cached;
   }
 
-  const openAiImage = await generateWithOpenAI(prompt);
-  await writeCache(cacheKey, openAiImage);
-  return openAiImage;
+  try {
+    ensureApiConfigured();
+    const response = await apiClient.post<StepImageResponse>('/ai/recipe-image', {
+      recipeId,
+      recipeTitle,
+      ingredients,
+    });
+
+    const imageUrl = response.data?.imageUrl || null;
+    await writeCache(cacheKey, imageUrl);
+    return imageUrl;
+  } catch (error) {
+    console.error('Recipe image generation failed:', error);
+    await writeCache(cacheKey, null);
+    return null;
+  }
 };

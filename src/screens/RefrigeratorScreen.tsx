@@ -4,40 +4,36 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useContext, useLayoutEffect, useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, {
-    FadeIn,
-    FadeInDown,
-    Layout,
-    SlideInRight,
-    SlideOutLeft,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring
+  FadeIn,
+  FadeInDown,
+  Layout,
+  SlideInRight,
+  SlideOutLeft,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from 'react-native-reanimated';
 import ThemeSwitcher from '../components/ThemeSwitcher';
+import { AppColors } from '../constants/Colors';
 import { ThemeContext } from '../context/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { getLocalQuickProducts } from '../services/recipeApi';
 
 type RefrigeratorScreenNavigationProp = StackNavigationProp<RootStackParamList>;
-
-const QUICK_INGREDIENTS = [
-  'картофель', 'лук', 'чеснок', 'морковь', 'помидор', 'огурец', 'капуста', 'перец',
-  'курица', 'говядина', 'свинина', 'рыба', 'яйца', 'молоко', 'сыр', 'масло',
-  'рис', 'макароны', 'грибы', 'хлеб',
-];
 
 interface IngredientItemProps {
   item: string;
   onRemove: () => void;
-  colors: any;
+  colors: AppColors;
   index: number;
 }
 
@@ -48,34 +44,31 @@ const IngredientItem: React.FC<IngredientItemProps> = ({ item, onRemove, colors,
     transform: [{ scale: scale.value }],
   }));
 
-  const handlePressIn = () => {
-    scale.value = withSpring(0.95);
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1);
-  };
-
   return (
     <Animated.View
       entering={SlideInRight.delay(index * 50).springify()}
       exiting={SlideOutLeft.duration(200)}
       layout={Layout.springify()}
-      style={[styles.ingredientItem, animatedStyle, { backgroundColor: colors.card }]}
+      style={[
+        styles.ingredientItem,
+        animatedStyle,
+        { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.shadow },
+      ]}
     >
       <View style={styles.ingredientLeft}>
         <Text style={[styles.ingredientText, { color: colors.text }]}>{item}</Text>
       </View>
-      <TouchableOpacity 
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
+      <TouchableOpacity
+        onPressIn={() => {
+          scale.value = withSpring(0.95);
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1);
+        }}
         onPress={onRemove}
         style={styles.removeButton}
       >
-        <LinearGradient
-          colors={['#FF6B6B', '#EE5A5A']}
-          style={styles.removeGradient}
-        >
+        <LinearGradient colors={['#FF6B6B', '#EE5A5A']} style={styles.removeGradient}>
           <Ionicons name="close" size={18} color="white" />
         </LinearGradient>
       </TouchableOpacity>
@@ -84,12 +77,12 @@ const IngredientItem: React.FC<IngredientItemProps> = ({ item, onRemove, colors,
 };
 
 const RefrigeratorScreen = () => {
+  const quickIngredients = getLocalQuickProducts();
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [currentIngredient, setCurrentIngredient] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const navigation = useNavigation<RefrigeratorScreenNavigationProp>();
-  const { colors } = useContext(ThemeContext);
-  
+  const { colors, theme } = useContext(ThemeContext);
   const buttonScale = useSharedValue(1);
 
   useLayoutEffect(() => {
@@ -98,13 +91,19 @@ const RefrigeratorScreen = () => {
     });
   }, [navigation]);
 
-  const handleAddIngredient = () => {
-    const trimmed = currentIngredient.trim().toLowerCase();
-    if (trimmed && !ingredients.includes(trimmed)) {
-      setIngredients((prev) => [...prev, trimmed]);
-      setCurrentIngredient('');
-      setSuggestions([]);
+  const addIngredient = (value: string) => {
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed || ingredients.includes(trimmed)) {
+      return;
     }
+
+    setIngredients((prev) => [...prev, trimmed]);
+    setCurrentIngredient('');
+    setSuggestions([]);
+  };
+
+  const handleAddIngredient = () => {
+    addIngredient(currentIngredient);
   };
 
   const handleIngredientInputChange = (value: string) => {
@@ -116,73 +115,63 @@ const RefrigeratorScreen = () => {
       return;
     }
 
-    const found = QUICK_INGREDIENTS
-      .filter((item) => item.includes(normalized) && !ingredients.includes(item))
-      .slice(0, 7);
-    setSuggestions(found);
-  };
-
-  const handleSuggestionPress = (value: string) => {
-    if (!ingredients.includes(value)) {
-      setIngredients((prev) => [...prev, value]);
-    }
-    setCurrentIngredient('');
-    setSuggestions([]);
-  };
-
-  const handleRemoveIngredient = (ingredientToRemove: string) => {
-    setIngredients(ingredients.filter(i => i !== ingredientToRemove));
+    setSuggestions(
+      quickIngredients.filter((item) => item.includes(normalized) && !ingredients.includes(item)).slice(
+        0,
+        7
+      )
+    );
   };
 
   const handleFindRecipes = () => {
-    navigation.navigate('Recipes', { ingredients });
+    navigation.navigate('Recipes', { ingredients, strictIngredients: false });
   };
 
   const animatedButtonStyle = useAnimatedStyle(() => ({
     transform: [{ scale: buttonScale.value }],
   }));
 
-  const handleButtonPressIn = () => {
-    buttonScale.value = withSpring(0.95);
-  };
-
-  const handleButtonPressOut = () => {
-    buttonScale.value = withSpring(1);
-  };
-
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1, backgroundColor: colors.background }}
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Animated Header */}
-        <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
-          <Text style={[styles.title, { color: colors.primary }]}>
-            Что приготовим?
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.tabBarInactive }]}>
-            Добавьте ингредиенты из холодильника
-          </Text>
+        <Animated.View entering={FadeInDown.delay(100).springify()}>
+          <LinearGradient
+            colors={theme === 'dark' ? ['#2D221C', '#211813', '#18221A'] : ['#FFF5EA', '#F6E5D4', '#E7F0E6']}
+            style={[styles.heroCard, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.title, { color: colors.text }]}>Что есть в холодильнике?</Text>
+            <Text style={[styles.subtitle, { color: colors.tabBarInactive }]}>
+              Добавьте продукты, а приложение подберет блюда и составит пошаговый рецепт.
+            </Text>
+          </LinearGradient>
         </Animated.View>
 
-        {/* Input Container */}
-        <Animated.View 
-          entering={FadeInDown.delay(200).springify()} 
-          style={styles.inputWrapper}
-        >
-          <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
-            <Ionicons name="add-circle-outline" size={24} color={colors.accent} style={styles.inputIcon} />
+        <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.inputWrapper}>
+          <View
+            style={[
+              styles.inputContainer,
+              { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.shadow },
+            ]}
+          >
+            <Ionicons
+              name="add-circle-outline"
+              size={24}
+              color={colors.accent}
+              style={styles.inputIcon}
+            />
             <TextInput
               style={[styles.input, { color: colors.text }]}
-              placeholder="Введите ингредиент..."
+              placeholder="Введите продукт..."
               placeholderTextColor={colors.tabBarInactive}
               value={currentIngredient}
               onChangeText={handleIngredientInputChange}
               onSubmitEditing={handleAddIngredient}
               returnKeyType="done"
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.accent }]}
               onPress={handleAddIngredient}
             >
@@ -193,20 +182,46 @@ const RefrigeratorScreen = () => {
 
         {suggestions.length > 0 && (
           <View style={[styles.suggestionsBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {suggestions.map((suggestion) => (
-              <TouchableOpacity key={suggestion} onPress={() => handleSuggestionPress(suggestion)} style={styles.suggestionButton}>
+            {suggestions.map((suggestion, index) => (
+              <TouchableOpacity
+                key={suggestion}
+                onPress={() => addIngredient(suggestion)}
+                style={[
+                  styles.suggestionButton,
+                  index === suggestions.length - 1 && styles.suggestionButtonLast,
+                ]}
+              >
                 <Text style={{ color: colors.text }}>{suggestion}</Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
 
-        {/* Counter */}
+        <View style={styles.quickProductsSection}>
+          <Text style={[styles.quickProductsLabel, { color: colors.tabBarInactive }]}>
+            Быстрый выбор продуктов
+          </Text>
+          <View style={styles.quickProductsWrap}>
+            {quickIngredients
+              .filter((item) => !ingredients.includes(item))
+              .slice(0, 10)
+              .map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={[
+                    styles.quickProductChip,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
+                  onPress={() => addIngredient(item)}
+                >
+                  <Text style={[styles.quickProductText, { color: colors.text }]}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+          </View>
+        </View>
+
         {ingredients.length > 0 && (
-          <Animated.View 
-            entering={FadeIn} 
-            style={[styles.counterContainer, { backgroundColor: colors.primary + '15' }]}
-          >
+          <Animated.View entering={FadeIn} style={[styles.counterContainer, { backgroundColor: colors.chip }]}>
             <Ionicons name="cube-outline" size={16} color={colors.primary} />
             <Text style={[styles.counter, { color: colors.primary }]}>
               {ingredients.length} ингредиент{ingredients.length === 1 ? '' : ingredients.length < 5 ? 'а' : 'ов'}
@@ -214,7 +229,6 @@ const RefrigeratorScreen = () => {
           </Animated.View>
         )}
 
-        {/* Ingredients List */}
         <Animated.FlatList
           data={ingredients}
           keyExtractor={(item) => item}
@@ -223,52 +237,52 @@ const RefrigeratorScreen = () => {
           renderItem={({ item, index }) => (
             <IngredientItem
               item={item}
-              onRemove={() => handleRemoveIngredient(item)}
+              onRemove={() => setIngredients((prev) => prev.filter((value) => value !== item))}
               colors={colors}
               index={index}
             />
           )}
           ListEmptyComponent={
-            <Animated.View 
-              entering={FadeIn.delay(300)} 
-              style={styles.emptyContainer}
-            >
+            <Animated.View entering={FadeIn.delay(300)} style={styles.emptyContainer}>
               <View style={[styles.emptyIconContainer, { backgroundColor: colors.card }]}>
                 <Ionicons name="nutrition-outline" size={50} color={colors.tabBarInactive} />
               </View>
-              <Text style={[styles.emptyText, { color: colors.text }]}>
-                Холодильник пуст
-              </Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>Холодильник пока пуст</Text>
               <Text style={[styles.emptySubtext, { color: colors.tabBarInactive }]}>
-                Начните добавлять ингредиенты{'\n'}которые есть у вас дома
+                Добавьте ингредиенты, которые есть дома,{'\n'}и приложение подберет подходящий рецепт
               </Text>
             </Animated.View>
           }
         />
 
-        {/* Find Recipes Button */}
-        <Animated.View 
+        <Animated.View
           entering={FadeInDown.delay(400).springify()}
           style={[styles.buttonWrapper, animatedButtonStyle]}
         >
-          <TouchableOpacity 
-            onPressIn={handleButtonPressIn}
-            onPressOut={handleButtonPressOut}
+          <TouchableOpacity
+            onPressIn={() => {
+              buttonScale.value = withSpring(0.95);
+            }}
+            onPressOut={() => {
+              buttonScale.value = withSpring(1);
+            }}
             onPress={handleFindRecipes}
             disabled={ingredients.length === 0}
             activeOpacity={0.9}
           >
             <LinearGradient
-              colors={ingredients.length > 0 
-                ? [colors.primary, colors.accent] 
-                : [colors.tabBarInactive, colors.tabBarInactive]}
+              colors={
+                ingredients.length > 0
+                  ? [colors.primary, colors.accent]
+                  : [colors.tabBarInactive, colors.tabBarInactive]
+              }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.findButton}
             >
-              <Ionicons name="search" size={22} color="white" />
-              <Text style={styles.findButtonText}>Найти рецепты</Text>
-              <Ionicons name="arrow-forward" size={22} color="white" />
+              <Ionicons name="search" size={22} color="#0b0f14" />
+              <Text style={styles.findButtonText}>Подобрать рецепты</Text>
+              <Ionicons name="arrow-forward" size={22} color="#0b0f14" />
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -280,21 +294,24 @@ const RefrigeratorScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 16,
   },
-  header: {
-    marginBottom: 24,
-    alignItems: 'center',
+  heroCard: {
+    borderWidth: 1,
+    borderRadius: 26,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    marginBottom: 18,
   },
   title: {
-    fontSize: 28,
+    fontSize: 29,
     fontWeight: '800',
-    marginBottom: 6,
+    marginBottom: 8,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 15,
-    fontWeight: '400',
+    lineHeight: 22,
   },
   inputWrapper: {
     marginBottom: 8,
@@ -302,11 +319,11 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
     borderRadius: 16,
     paddingLeft: 16,
     paddingRight: 6,
     paddingVertical: 6,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -329,7 +346,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 28,
     fontWeight: '300',
     marginTop: -2,
@@ -361,6 +378,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#ececec',
   },
+  suggestionButtonLast: {
+    borderBottomWidth: 0,
+  },
+  quickProductsSection: {
+    marginBottom: 12,
+  },
+  quickProductsLabel: {
+    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  quickProductsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  quickProductChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  quickProductText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
   list: {
     flex: 1,
   },
@@ -374,7 +417,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginVertical: 5,
     borderRadius: 16,
-    shadowColor: '#000',
+    borderWidth: 1,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -388,7 +431,6 @@ const styles = StyleSheet.create({
   ingredientText: {
     fontSize: 16,
     fontWeight: '600',
-    textTransform: 'capitalize',
     flex: 1,
   },
   removeButton: {
@@ -442,10 +484,9 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   findButtonText: {
-    color: 'white',
-    fontSize: 18,
+    color: '#0b0f14',
+    fontSize: 17,
     fontWeight: '700',
-    letterSpacing: 0.5,
   },
 });
 

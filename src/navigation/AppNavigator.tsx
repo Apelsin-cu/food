@@ -5,19 +5,21 @@ import { createStackNavigator } from '@react-navigation/stack';
 import React, { useContext } from 'react';
 import { ThemeContext } from '../context/ThemeContext';
 import FavoritesScreen from '../screens/FavoritesScreen';
+import HomeScreen from '../screens/HomeScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 import RefrigeratorScreen from '../screens/RefrigeratorScreen';
+import RecipesScreen from '../screens/RecipesScreen';
 import { Recipe } from '../types/recipe';
-
-const HomeScreen = require('../screens/HomeScreen').default;
-const RecipesScreen = require('../screens/RecipesScreen').default;
 
 export type RootStackParamList = {
   Main: undefined;
-  Recipes: {
-    ingredients?: string[];
-    initialQuery?: string;
-  } | undefined;
+  Recipes:
+    | {
+        ingredients?: string[];
+        initialQuery?: string;
+        strictIngredients?: boolean;
+      }
+    | undefined;
   RecipeDetail: { recipe: Recipe };
 };
 
@@ -32,6 +34,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 const MainTabs = () => {
   const { colors } = useContext(ThemeContext);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -54,31 +57,43 @@ const MainTabs = () => {
           backgroundColor: colors.tabBar,
         },
         headerTitleStyle: {
-          color: colors.primary,
+          color: colors.text,
+          fontWeight: '700',
         },
+        headerShadowVisible: false,
         tabBarStyle: {
           backgroundColor: colors.tabBar,
-          marginHorizontal: 12,
-          marginBottom: 10,
-          borderRadius: 16,
-          height: 58,
+          marginHorizontal: 14,
+          marginBottom: 12,
+          borderRadius: 24,
+          height: 68,
           paddingBottom: 8,
           paddingTop: 8,
           borderTopWidth: 0,
           elevation: 8,
           shadowColor: colors.shadow,
-          shadowOpacity: 0.12,
-          shadowOffset: { width: 0, height: 3 },
-          shadowRadius: 8,
-        }
+          shadowOpacity: 0.08,
+          shadowOffset: { width: 0, height: 10 },
+          shadowRadius: 20,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+        },
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Рекомендации' }} />
-      <Tab.Screen name="Refrigerator" component={RefrigeratorScreen} options={{ title: 'Мой холодильник' }} />
+      <Tab.Screen
+        name="Refrigerator"
+        component={RefrigeratorScreen}
+        options={{ title: 'Мой холодильник' }}
+      />
       <Tab.Screen name="Favorites" component={FavoritesScreen} options={{ title: 'Избранное' }} />
     </Tab.Navigator>
   );
-}
+};
 
 const AppNavigator = () => {
   const { colors, theme } = useContext(ThemeContext);
@@ -104,14 +119,20 @@ const AppNavigator = () => {
             backgroundColor: colors.tabBar,
           },
           headerTitleStyle: {
-            color: colors.primary,
+            color: colors.text,
+            fontWeight: '700',
           },
           headerTintColor: colors.primary,
+          headerShadowVisible: false,
         }}
       >
         <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
         <Stack.Screen name="Recipes" component={RecipesScreen} options={{ title: 'Рецепты' }} />
-        <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} options={{ title: 'Детали рецепта' }} />
+        <Stack.Screen
+          name="RecipeDetail"
+          component={RecipeDetailScreen}
+          options={{ title: 'Детали рецепта' }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
